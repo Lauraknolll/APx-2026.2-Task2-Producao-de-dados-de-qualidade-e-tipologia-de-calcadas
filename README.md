@@ -1,93 +1,180 @@
-# apx-template
+# 🏛️ AP[x] — Atelier de Projetos de Extensão
 
+> **O AP[x] é um projeto de extensão com o objetivo de proporcionar aos estudantes de Engenharia de Computação e Sistemas de Informação do Câmpus Curitiba da UTFPR a oportunidade de apoiar ações do poder público voltadas ao planejamento e à administração da cidade que demandem suporte técnico da área de Tecnologia da Informação e Comunicação (TIC). Este apoio será prestado em horas de trabalho caracterizadas como carga horária de extensão, a serem creditadas no histórico acadêmico de cada estudante participante do projeto.**
 
+---
 
-## Getting started
+## 📋 Índice
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+- [Sobre o AP[x]](#-sobre-o-apx)
+- [Objetivos](#-objetivos)
+- [Estrutura](#-estrutura)
+- [Como Usar](#-como-usar)
+- [Regras](#-regras)
+- [Fluxo de Trabalho](#-fluxo-de-trabalho)
+- [Licença](#-licença)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+---
 
-## Add your files
+## 🧭 Sobre o AP[x]
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+O **AP[x] — Atelier de Projetos de Extensão** é uma iniciativa que une:
+
+- **Universidade (UTFPR):** estudantes dos cursos de **Engenharia de Computação** e **Sistemas de Informação** aplicam conhecimento acadêmico em problemas reais.
+- **Órgão Público (IPPUC):** a **Diretoria Hipervisor Curitiba** do IPPUC propõe demandas reais da cidade de Curitiba que podem ser resolvidas ou apoiadas por soluções tecnológicas.
+
+Cada estudante pode dedicar **até 120 horas por semestre** ao projeto, e as atividades são gerenciadas via **GitLab Issue Board**.
+
+### 🎯 Objetivos
+
+1. Resolver problemas reais do IPPUC com tecnologia
+2. Formar estudantes com experiência prática em projetos reais
+3. Garantir rastreabilidade total das atividades
+4. Produzir documentação que permaneça como legado para a cidade
+
+---
+
+## 📁 Estrutura
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/mizidoro/apx-template.git
-git branch -M main
-git push -uf origin main
+├── data/                # Dados (raw, processed, reports)
+├── docs/                # Decisões arquiteturais, relatórios, atas, especificações
+├── notebooks/           # Jupyter Notebooks para análises exploratórias
+├── scripts/             # Scripts utilitários do projeto
+└── README.md
 ```
 
-## Integrate with your tools
+Cada pasta possui um `README.md` próprio com detalhes de uso.
 
-* [Set up project integrations](https://gitlab.com/mizidoro/apx-template/-/settings/integrations)
+---
 
-## Collaborate with your team
+## 🚀 Como Usar
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Criar um repositório a partir do template
 
-## Test and Deploy
+```bash
+git clone https://gitlab.com/izidoromth/apx-template.git nome-da-task
+cd nome-da-task
+git remote remove origin
+git remote add origin https://gitlab.com/seu-usuario/nome-da-task.git
+git push -u origin main
+```
 
-Use the built-in continuous integration in GitLab.
+### Configurar o Issue Board
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Colunas do Kanban:
+- 📝 **A Fazer** — Issues cadastradas e priorizadas
+- 👨‍💻 **Em Andamento** — Em desenvolvimento
+- 🚧 **Bloqueado** — Aguardando dependência a ser resolvida
+- ✅ **Revisão** — Aguardando validação (Ippuc)
+- ✔️ **Concluído** — Finalizado
 
-***
+---
 
-# Editing this README
+## 📜 Regras
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 👥 Responsabilidades
 
-## Suggestions for a good README
+| Quem           | Responsabilidade |
+|----------------|------------------|
+| **Orientador** | Orientar a equipe, revisar código, priorizar o Board, validar entregas, ser ponte entre equipe e IPPUC |
+| **Equipe**     | Manter o Board atualizado, cadastrar e puxar Issues, desenvolver, documentar, registrar horas |
+| **IPPUC**      | Apresentar demandas em reuniões, esclarecer dúvidas, validar entregas |
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+### ⏱ Carga Horária
 
-## Name
-Choose a self-explaining name for your project.
+- Cada estudante: **até 120 horas/semestre**
+- Distribuição sugerida: ~8h/semana por 15 semanas
+- Registrar horas gastas nos comentários da Issue ao movê-la para "Concluído"
+- O orientador acompanha o total por estudante
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### 🏷 Issues — Padrão Obrigatório
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+| Elemento            | Obrigatório? | Descrição |
+|---------------------|:---:|-----------|
+| Título claro        | ✅  | Resumo direto do que precisa ser feito |
+| Descrição           | ✅  | Contexto + objetivo + critérios de aceitação |
+| Critérios de aceitação | ✅ | Lista de verificação do que define "pronto" |
+| Assignee            | ✅  | Quem está responsável |
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+#### ⚠️ Regras importantes sobre Issues
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+- **Cada Issue = uma entrega**. Issues genéricas demais ("fazer o projeto") devem ser detalhadas
+- Issues que perderam relevância devem ser fechadas com justificativa
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### 🌿 Branches
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+Toda branch deve seguir o padrão:
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```
+<tipo>/<numero-da-issue>-<descricao-curta>
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+| Tipo          | Exemplo                          | Quando usar |
+|---------------|----------------------------------|-------------|
+| `feature/`    | `feature/42-api-consulta`       | Nova funcionalidade |
+| `fix/`        | `fix/17-corrige-parsing`        | Correção de bug |
+| `docs/`       | `docs/05-atualiza-readme`       | Documentação |
+| `refactor/`   | `refactor/08-modulariza-api`    | Refatoração sem mudar comportamento |
+| `test/`       | `test/23-adiciona-testes`       | Testes |
+| `chore/`      | `chore/31-atualiza-deps`        | Manutenção (dependências, CI) |
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+**Regras:**
+- Sempre partir da `main` atualizada
+- Uma branch por Issue
+- Deletar a branch após o merge
+- **Nunca commitar diretamente na `main`**
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 💬 Commits (Conventional Commits)
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```
+<tipo>(<escopo opcional>): <descrição curta>
 
-## License
-For open source projects, say how it is licensed.
+<corpo opcional>
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+<rodapé opcional>
+```
+
+**Regras:**
+- Título com **no máximo 72 caracteres**
+- Usar **imperativo**: "adiciona", não "adicionou" nem "adicionado"
+- Commits **atômicos**: uma mudança lógica por commit
+- Vincular à Issue no rodapé: `Closes #42`, `Refs #17`
+
+**Exemplos:**
+```
+feat(api): adiciona endpoint GET /api/v1/zonas
+
+Implementa consulta de zonas com filtro por bairro.
+
+Closes #42
+```
+```
+fix(parser): corrige encoding de caracteres especiais
+
+Arquivos CSV do IPPUC usavam latin-1, agora tratamos UTF-8.
+
+Closes #17
+```
+```
+docs(readme): atualiza instruções de configuração
+```
+```
+chore(deps): atualiza pandas para 2.1.0
+```
+
+### 🔄 Fluxo no Board
+
+| Coluna              | Quem move | O que significa |
+|---------------------|-----------|-----------------|
+| 📝 **A Fazer**      | Estudante | Issue cadastrada e priorizada pela equipe e atribuída a um estudante |
+| 👨‍💻 **Em Andamento**| Estudante | Issue em desenvolvimento |
+| 🚧 **Bloqueado**    | Estudante | Issue depende de algo externo para prosseguir |
+| ✅ **Revisão**      | Estudante | Código pronto, aguardando validação |
+| ✔️ **Concluído**    | Orientador | Entregue e aprovado |
+
+**Responsabilidades de atualização:**
+- **Estudantes:** manter o Board atualizado diariamente
+- **IPPUC:** acompanhar pelo Board o andamento
+
+---
