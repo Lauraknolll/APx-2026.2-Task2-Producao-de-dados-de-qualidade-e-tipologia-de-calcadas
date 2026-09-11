@@ -1,0 +1,12 @@
+# Ambientes virtuais e cache
+.venv/
+__pycache__/
+*.py[cod]
+
+# Modelos e arquivos pesados (>50MB)
+data/models/*.pth
+data/models/*.pt
+*.zip
+
+# Repositório clonado para referência local
+sidewalk-tagger-ai/
