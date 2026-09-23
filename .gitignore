@@ -2,6 +2,7 @@
 .venv/
 __pycache__/
 *.py[cod]
+.vscode/
 
 # Modelos e arquivos pesados (>50MB)
 data/models/*.pth
