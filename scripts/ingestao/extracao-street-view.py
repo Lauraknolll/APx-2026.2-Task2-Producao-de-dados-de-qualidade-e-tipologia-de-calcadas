@@ -4,12 +4,14 @@ import requests
 from io import BytesIO
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dotenv import load_dotenv
 
+load_dotenv()
 
-API_KEY = ""
+API_KEY = os.getenv("GOOGLE_STREET_VIEW_API_KEY", "")
 
-PASTA_SAIDA = "dataset_calcadas_cic"
-TOTAL_IMAGENS_ALVO = 100
+PASTA_SAIDA = os.getenv("PASTA_IMAGENS", "dataset_calcadas_cic")
+TOTAL_IMAGENS_ALVO = int(os.getenv("TOTAL_IMAGENS_ALVO", "100"))
 MAX_WORKERS = 10  # Downloads em paralelo
 
 # Coordenadas GPS Reais (Início e Fim) das 9 Ruas em Curitiba
