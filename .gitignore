@@ -1,3 +1,9 @@
+# Secrets e configs
+.env
+
+# Diretórios de datasets locais
+dataset_calcadas_cic/
+
 # Ambientes virtuais e cache
 .venv/
 __pycache__/

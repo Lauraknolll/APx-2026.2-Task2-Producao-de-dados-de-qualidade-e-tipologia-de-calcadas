@@ -2,14 +2,16 @@ import os
 import glob
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from roboflow import Roboflow
+from dotenv import load_dotenv
 
-ROBOFLOW_API_KEY = ""
+load_dotenv()
 
-# ID do seu Workspace e do Projeto (encontrados na URL do seu projeto no Roboflow)
-WORKSPACE_NAME = ""
-PROJECT_NAME = ""
+ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
 
-PASTA_IMAGENS = ""
+WORKSPACE_NAME = os.getenv("ROBOFLOW_WORKSPACE_NAME", "")
+PROJECT_NAME = os.getenv("ROBOFLOW_PROJECT_NAME", "")
+
+PASTA_IMAGENS = os.getenv("PASTA_IMAGENS", "dataset_calcadas_cic")
 MAX_WORKERS = 5  # Quantidade de uploads simultâneos (para não estourar o limite da API)
 
 
