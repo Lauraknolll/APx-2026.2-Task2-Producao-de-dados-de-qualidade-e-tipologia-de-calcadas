@@ -17,14 +17,10 @@ def process_split(split_name, base_dir, processor, model, device):
     with open(json_path, 'r') as f:
         coco_data = json.load(f)
         
-    # Mapear os IDs das categorias que queremos ("Adequada" e "Inadequada")
-    cat_adequada_id = None
-    cat_inadequada_id = None
+    # Mapear os IDs de todas as categorias
+    cat_ids = {}
     for cat in coco_data.get('categories', []):
-        if cat['name'] == 'Adequada':
-            cat_adequada_id = cat['id']
-        elif cat['name'] == 'Inadequada':
-            cat_inadequada_id = cat['id']
+        cat_ids[cat['name']] = cat['id']
             
     # Mapear quais categorias cada imagem possui
     img_to_cats = {}
@@ -37,19 +33,34 @@ def process_split(split_name, base_dir, processor, model, device):
     labels_list = []
     
     # Processar cada imagem listada
-    print(f"Extraindo features em '{split_name}' (ignorando imagens irrelevantes)...")
+    print(f"Extraindo features em '{split_name}'...")
     for img_info in tqdm(coco_data['images']):
         img_id = img_info['id']
         
         cats = img_to_cats.get(img_id, set())
+        if not cats:
+            continue # Ignora se não tiver nenhuma anotação
+            
+        # Regra de Prioridade:
+        # 1. Não identificável (Classe 3)
+        # 2. Sem calçada (Classe 2)
+        # 3. Inadequada (Classe 1)
+        # 4. Adequada (Classe 0)
         
-        # Regra de Prioridade (Pior Caso):
-        if cat_inadequada_id in cats:
+        id_nao = cat_ids.get('Nao identificavel')
+        id_sem = cat_ids.get('Sem calcada')
+        id_inadequada = cat_ids.get('Inadequada')
+        id_adequada = cat_ids.get('Adequada')
+        
+        if id_nao and id_nao in cats:
+            label = 3
+        elif id_sem and id_sem in cats:
+            label = 2
+        elif id_inadequada and id_inadequada in cats:
             label = 1
-        elif cat_adequada_id in cats:
+        elif id_adequada and id_adequada in cats:
             label = 0
         else:
-            # Se não tem Adequada nem Inadequada, ignora a imagem
             continue
             
         img_filename = img_info['file_name']
@@ -83,7 +94,7 @@ def process_split(split_name, base_dir, processor, model, device):
 def main():
     # Configurações de caminhos
     DATASET_DIR = "data/raw/apx2-bzsou-v2"
-    OUTPUT_DIR = "data/processed"
+    OUTPUT_DIR = f"data/processed/{os.path.basename(DATASET_DIR)}"
     MODEL_ID = "projectsidewalk/sidewalk-validator-ai-surfaceproblem"
     
     if not os.path.exists(DATASET_DIR):

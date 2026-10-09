@@ -11,12 +11,13 @@ def evaluate_model(model, features, labels, split_name):
     print(f"\n--- Resultados no conjunto de {split_name.upper()} ---")
     print(f"Acurácia: {acc:.4f}")
     print("\nRelatório de Classificação:")
-    print(classification_report(labels, predictions, labels=[0, 1], target_names=["Regular (0)", "Irregular (1)"], zero_division=0))
+    target_names = ["Adequada (0)", "Inadequada (1)", "Sem calçada (2)", "Não identificável (3)"]
+    print(classification_report(labels, predictions, labels=[0, 1, 2, 3], target_names=target_names, zero_division=0))
     
-    return confusion_matrix(labels, predictions, labels=[0, 1])
+    return confusion_matrix(labels, predictions, labels=[0, 1, 2, 3])
 
 def main():
-    DATA_DIR = "data/processed"
+    DATA_DIR = "data/processed/apx2-bzsou-v2"
     
     # 1. Carregar as features e labels extraídas
     print("Carregando features extraídas pelo DINOv2...")
@@ -50,8 +51,8 @@ def main():
     os.makedirs("data/reports", exist_ok=True)
     plt.figure(figsize=(6,5))
     sns.heatmap(cm_test, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=["Regular", "Irregular"], 
-                yticklabels=["Regular", "Irregular"])
+                xticklabels=["Adequada", "Inadequada", "Sem calçada", "Não id."], 
+                yticklabels=["Adequada", "Inadequada", "Sem calçada", "Não id."])
     plt.title('Matriz de Confusão (Teste)')
     plt.ylabel('Verdadeiro')
     plt.xlabel('Previsto')
