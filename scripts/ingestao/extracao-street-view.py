@@ -19,7 +19,6 @@ MAX_WORKERS = 10  # Downloads em paralelo
 RUAS_CURITIBA = {
 
 # --- CIC / VILA NOSSA SENHORA DA LUZ ---
-    "rua_padre_gaston": ((-25.5065, -49.3255), (-25.5115, -49.3205)),
     "rua_santa_angela_de_foligno": ((-25.5075, -49.3235), (-25.5105, -49.3195)),
     "rua_desembargador_cid_campelo": ((-25.5020, -49.3320), (-25.5220, -49.3140)),
     "rua_pedro_gusso": ((-25.4950, -49.3080), (-25.5130, -49.3280)),

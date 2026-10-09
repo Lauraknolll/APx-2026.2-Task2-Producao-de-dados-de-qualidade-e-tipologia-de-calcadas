@@ -18,3 +18,4 @@ data/models/*.pt
 # Repositório clonado para referência local
 sidewalk-tagger-ai/
 data/raw/apx2*/
+data/processed/apx2*/

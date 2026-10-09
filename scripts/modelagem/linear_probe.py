@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -36,11 +36,10 @@ def main():
 
     print(f"Dimensões de Treino: {X_train.shape} (Features), {y_train.shape} (Labels)")
     
-    # 2. Treinar o modelo linear (Linear Probing)
-    print("\nTreinando Regressão Logística (Linear Probe)...")
-    # max_iter aumentado pois o DINOv2 Large gera features complexas
-    # class_weight='balanced' ajuda caso tenhamos muitas mais calçadas de um tipo do que do outro
-    clf = LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42)
+    # 2. Treinar o modelo (MLP Classifier)
+    print("\nTreinando Classificador MLP (Multi-Layer Perceptron)...")
+    # Usando a mesma arquitetura do Project Sidewalk: 1 camada escondida com 256 neurônios e ReLU
+    clf = MLPClassifier(hidden_layer_sizes=(256,), activation='relu', max_iter=1000, random_state=42)
     clf.fit(X_train, y_train)
     
     # 3. Avaliar nos conjuntos de validação e teste
