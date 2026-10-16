@@ -1,3 +1,9 @@
+# Secrets e configs
+.env
+
+# Diretórios de datasets locais
+dataset_calcadas_cic/
+
 # Ambientes virtuais e cache
 .venv/
 __pycache__/
@@ -11,3 +17,7 @@ data/models/*.pt
 
 # Repositório clonado para referência local
 sidewalk-tagger-ai/
+data/raw/apx2*/
+data/processed/apx2*/
+
+.ipynb_checkpoints/
