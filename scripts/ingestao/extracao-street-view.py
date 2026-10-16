@@ -1,41 +1,108 @@
 import os
 import math
+import json
 import requests
 from io import BytesIO
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dotenv import load_dotenv
 
-load_dotenv()
 
 API_KEY = os.getenv("GOOGLE_STREET_VIEW_API_KEY", "")
+PASTA_SAIDA = os.getenv("PASTA_IMAGENS", "dataset_calcadas_curitiba")
+TOTAL_IMAGENS_ALVO = 5
+IMAGENS_POR_BAIRRO = 1
+MAX_WORKERS = 10
 
-PASTA_SAIDA = os.getenv("PASTA_IMAGENS", "dataset_calcadas_cic")
-TOTAL_IMAGENS_ALVO = int(os.getenv("TOTAL_IMAGENS_ALVO", "100"))
-MAX_WORKERS = 10  # Downloads em paralelo
-
-# Coordenadas GPS Reais (Início e Fim) das 9 Ruas em Curitiba
-# Formato: (Lat_Inicio, Lon_Inicio), (Lat_Fim, Lon_Fim)
-RUAS_CURITIBA = {
-
-# --- CIC / VILA NOSSA SENHORA DA LUZ ---
-    "rua_padre_gaston": ((-25.5065, -49.3255), (-25.5115, -49.3205)),
-    "rua_santa_angela_de_foligno": ((-25.5075, -49.3235), (-25.5105, -49.3195)),
-    "rua_desembargador_cid_campelo": ((-25.5020, -49.3320), (-25.5220, -49.3140)),
-    "rua_pedro_gusso": ((-25.4950, -49.3080), (-25.5130, -49.3280)),
-}
-
-# Parâmetros de enquadramento
-PITCH = -10
-FOV = 80
+PITCH = -15     
+FOV = 75        
 LARGURA_API = 512
 ALTURA_API = 512
-SCALE = 2
+SCALE = 2       
 
+# Resolução DINOv2
+LARGURA_DINO = 512
+ALTURA_DINO = 512
+
+LISTA_BAIRROS = [
+    "Cidade Industrial de Curitiba",
+    "Batel",
+    "Centro",
+    "Portão",
+    "Santa Felicidade",
+]
+
+
+def buscar_ruas_por_lista_bairros(lista_bairros, cidade="Curitiba"):
+    """
+    Consulta o OpenStreetMap e retorna as ruas associadas aos bairros informados.
+    """
+    bairros_regex = "^(" + "|".join(lista_bairros) + ")$"
+    print(f"[OSM] Consultando {len(lista_bairros)} bairros em {cidade} via Overpass API...")
+
+    overpass_query = f"""
+    [out:json][timeout:60];
+    area["name"="{cidade}"]->.cidadeArea;
+    area["name"~"{bairros_regex}"]->.bairrosArea;
+    (
+      way["highway"~"residential|tertiary|secondary|unclassified"](area.cidadeArea)(area.bairrosArea);
+    );
+    out body geom qt;
+    """
+
+    headers = {
+        "User-Agent": "UTFPR-BioGuardian-StreetViewExtractor/1.0 (academic project)",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+    }
+
+    ENDPOINTS_OVERPASS = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    ]
+
+    for url in ENDPOINTS_OVERPASS:
+        try:
+            print(f"[OSM] Tentando servidor: {url} ...")
+            response = requests.post(url, data={"data": overpass_query}, headers=headers, timeout=60)
+            
+            if response.status_code == 200:
+                data = response.json()
+                elements = data.get("elements", [])
+
+                ruas_encontradas = {}
+                for elem in elements:
+                    geometry = elem.get("geometry", [])
+                    tags = elem.get("tags", {})
+                    nome_rua = tags.get("name", f"rua_sem_nome_{elem['id']}")
+
+                    if len(geometry) >= 2:
+                        p1 = (geometry[0]["lat"], geometry[0]["lon"])
+                        p2 = (geometry[-1]["lat"], geometry[-1]["lon"])
+                        chave_rua = f"{nome_rua.lower().replace(' ', '_')}_{elem['id']}"
+                        
+                        bairro_est = tags.get("addr:suburb", lista_bairros[0])
+
+                        ruas_encontradas[chave_rua] = {
+                            "p1": p1,
+                            "p2": p2,
+                            "nome": nome_rua,
+                            "bairro": bairro_est
+                        }
+
+                print(f"[OSM] Sucesso! {len(ruas_encontradas)} trechos de ruas recuperados.")
+                return ruas_encontradas
+            else:
+                print(f"[OSM] Servidor {url} retornou HTTP {response.status_code}. Tentando próximo...")
+
+        except requests.exceptions.RequestException:
+            print(f"[OSM] Timeout/Erro no servidor {url}. Tentando próximo espelho...")
+
+    print("[ERRO CRÍTICO] Todos os servidores do Overpass falharam.")
+    return {}
 
 
 def calcular_bearing(lat1, lon1, lat2, lon2):
-    """Calcula a direção da rua em graus."""
+    """Calcula o azimute entre dois pontos GPS consecutivos."""
     lat1_rad, lon1_rad, lat2_rad, lon2_rad = map(math.radians, [lat1, lon1, lat2, lon2])
     dlon = lon2_rad - lon1_rad
     x = math.sin(dlon) * math.cos(lat2_rad)
@@ -45,7 +112,6 @@ def calcular_bearing(lat1, lon1, lat2, lon2):
 
 
 def gerar_pontos_interpolados(ponto_inicial, ponto_final, quantidade_pontos):
-    """Gera coordenadas distribuídas ao longo de toda a extensão da rua."""
     lat1, lon1 = ponto_inicial
     lat2, lon2 = ponto_final
     pontos = []
@@ -58,35 +124,47 @@ def gerar_pontos_interpolados(ponto_inicial, ponto_final, quantidade_pontos):
 
 
 def obter_metadata_streetview(lat, lon, api_key):
-    """Obtém o Pano ID único da imagem panorâmica do Google."""
+    """Obtém o Pano ID e valida a imagem oficial da Google."""
     url = "https://maps.googleapis.com/maps/api/streetview/metadata"
-    params = {"location": f"{lat},{lon}", "key": api_key}
+    params = {"location": f"{lat},{lon}", "radius": 20, "key": api_key, "source": "outdoor"}
+
     try:
         resp = requests.get(url, params=params, timeout=8)
         if resp.status_code == 200:
             data = resp.json()
             status = data.get("status")
-            if status == "OK":
+            copyright_info = data.get("copyright", "")
+            
+            if status == "OK" and "Google" in copyright_info:
                 return data.get("pano_id"), data.get("location", {}).get("lat"), data.get("location", {}).get("lng"), None
+            elif status == "OK" and "Google" not in copyright_info:
+                return None, None, None, "Foto interna/terceiros descartada"
+            elif status == "ZERO_RESULTS":
+                return None, None, None, "Sem cobertura"
             else:
-                return None, None, None, f"Status API: {status} ({data.get('error_message', 'sem mensagem')})"
+                return None, None, None, f"Erro API ({status})"
     except Exception as e:
         return None, None, None, str(e)
     return None, None, None, "Erro desconhecido"
 
 
-def processar_e_salvar_imagem_dinov2(conteudo_bytes, caminho_saida):
-    """Corta topo/céu e ajusta proporção exata para múltiplos de 14."""
+def processar_e_salvar_imagem(conteudo_bytes, caminho_saida):
+    """Corta topo/céu e ajusta proporção para o DINOv2."""
     img = Image.open(BytesIO(conteudo_bytes))
     w, h = img.size
     crop_box = (0, int(h * 0.25), w, h)
     img_cortada = img.crop(crop_box)
-    img_final = img_cortada.resize((LARGURA_API, ALTURA_API), Image.Resampling.LANCZOS)
+    img_final = img_cortada.resize((LARGURA_DINO, ALTURA_DINO), Image.Resampling.LANCZOS)
     img_final.save(caminho_saida, "JPEG", quality=95)
 
 
-def baixar_imagem(idx, nome_rua_limpo, pano_id, heading, lado, pasta_saida, api_key):
-    """Faz o download da imagem final."""
+def baixar_imagem_e_salvar_metadados(idx, dados_tarefa, pasta_saida, api_key):
+    """
+    Baixa a imagem do Street View e gera simultaneamente o ficheiro .json
+    de metadados geográficos para integração com o Roboflow.
+    """
+    nome_rua_limpo, pano_id, heading, lado, real_lat, real_lon, bairro, nome_rua = dados_tarefa
+
     url = "https://maps.googleapis.com/maps/api/streetview"
     params = {
         "size": f"{LARGURA_API}x{ALTURA_API}",
@@ -95,18 +173,38 @@ def baixar_imagem(idx, nome_rua_limpo, pano_id, heading, lado, pasta_saida, api_
         "heading": round(heading, 2),
         "pitch": PITCH,
         "fov": FOV,
-        "key": api_key
+        "source": "outdoor",
+        "return_error_code": "true",
+        "key": api_key,
     }
-    
-    nome_arquivo = os.path.join(
-        pasta_saida, f"{nome_rua_limpo}_{idx:04d}_{lado}_pano_{pano_id[:8]}.jpg"
-    )
-    
+
+    nome_rua_curto = nome_rua_limpo[:25]
+    nome_base = f"{idx:04d}_{nome_rua_curto}_{lado}_pano_{pano_id[:8]}"
+    caminho_imagem = os.path.join(pasta_saida, f"{nome_base}.jpg")
+    caminho_json = os.path.join(pasta_saida, f"{nome_base}.json")
+
     try:
         response = requests.get(url, params=params, timeout=15)
         if response.status_code == 200:
-            processar_e_salvar_imagem_dinov2(response.content, nome_arquivo)
-            return True, nome_arquivo
+            # 1. Salva a imagem cortada
+            processar_e_salvar_imagem(response.content, caminho_imagem)
+
+            # 2. Salva o arquivo JSON de metadados para o Roboflow
+            metadados_json = {
+                "lat": real_lat,
+                "lon": real_lon,
+                "pano_id": pano_id,
+                "heading": round(heading, 2),
+                "pitch": PITCH,
+                "bairro": bairro,
+                "nome_rua": nome_rua,
+                "lado": lado
+            }
+            
+            with open(caminho_json, "w", encoding="utf-8") as f:
+                json.dump(metadados_json, f, ensure_ascii=False, indent=2)
+
+            return True, caminho_imagem
         else:
             return False, f"Erro HTTP {response.status_code}"
     except Exception as e:
@@ -114,98 +212,89 @@ def baixar_imagem(idx, nome_rua_limpo, pano_id, heading, lado, pasta_saida, api_
 
 
 def main():
-    if API_KEY == "SUA_CHAVE_API_AQUI" or not API_KEY.strip():
-        print("[ERRO CRÍTICO] Você precisa colar sua chave da API do Google na variável API_KEY!")
+    if not API_KEY.strip():
+        print("[ERRO CRÍTICO] Defina GOOGLE_STREET_VIEW_API_KEY no arquivo .env!")
+        return
+
+    ruas_dinamicas = buscar_ruas_por_lista_bairros(LISTA_BAIRROS, cidade="Curitiba")
+
+    if not ruas_dinamicas:
+        print("[ERRO] Nenhuma rua foi recuperada pelo OpenStreetMap.")
         return
 
     os.makedirs(PASTA_SAIDA, exist_ok=True)
-    qtd_ruas = len(RUAS_CURITIBA)
-    
-    print("=" * 75)
-    print("COLETA DE DATASET DE CALÇADAS DE CURITIBA (DINOv2)")
-    print(f"Total de Ruas Mapeadas: {qtd_ruas}")
-    print(f"Meta de Imagens Únicas: {TOTAL_IMAGENS_ALVO}")
-    print("=" * 75)
-    
     panos_vistos = set()
     tarefas = []
     global_idx = 1
-    
-    # Geramos 120 candidatos por rua para garantir amostragem longa
-    pontos_candidatos_por_rua = 120  
-    
-    for idx_rua, (nome_rua, (p1, p2)) in enumerate(RUAS_CURITIBA.items(), start=1):
-        print(f"[{idx_rua}/{qtd_ruas}] Mapeando pontos na rua: {nome_rua}...")
-        
-        bearing_rua = calcular_bearing(p1[0], p1[1], p2[0], p2[1])
-        pontos = gerar_pontos_interpolados(p1, p2, pontos_candidatos_por_rua)
+    pontos_por_rua = 20
 
-        fotos_da_rua = 0
-        erros_api = set()
+    print("=" * 75)
+    print(f"PROCESSANDO VARREDURA EM {len(LISTA_BAIRROS)} BAIRROS DE CURITIBA")
+    print(f"Meta Global de Imagens: {TOTAL_IMAGENS_ALVO}")
+    print("=" * 75)
 
-        for lat, lon in pontos:
+    for chave_rua, dados_rua in ruas_dinamicas.items():
+        if len(tarefas) >= TOTAL_IMAGENS_ALVO:
+            break
+
+        p1 = dados_rua["p1"]
+        p2 = dados_rua["p2"]
+        nome_rua = dados_rua["nome"]
+        bairro = dados_rua["bairro"]
+
+        pontos = gerar_pontos_interpolados(p1, p2, pontos_por_rua)
+
+        for i in range(len(pontos) - 1):
             if len(tarefas) >= TOTAL_IMAGENS_ALVO:
                 break
 
-            pano_id, real_lat, real_lon, erro = obter_metadata_streetview(lat, lon, API_KEY)
-            
-            if erro:
-                erros_api.add(erro)
+            p_atual = pontos[i]
+            p_proximo = pontos[i + 1]
 
-            if pano_id and pano_id not in panos_vistos:
+            pano_id, real_lat, real_lon, erro = obter_metadata_streetview(p_atual[0], p_atual[1], API_KEY)
+
+            if erro or not pano_id:
+                continue
+
+            if pano_id not in panos_vistos:
                 panos_vistos.add(pano_id)
-                
-                heading_direita = (bearing_rua + 90) % 360
-                heading_esquerda = (bearing_rua - 90) % 360
-                
-                # Foto calçada direita
-                tarefas.append((global_idx, nome_rua, pano_id, heading_direita, "direita"))
+
+                # Bearing local calculado no trecho atual
+                bearing_local = calcular_bearing(p_atual[0], p_atual[1], p_proximo[0], p_proximo[1])
+
+                heading_direita = (bearing_local + 90) % 360
+                heading_esquerda = (bearing_local - 90) % 360
+
+                # Dados para tarefa direita
+                dados_dir = (chave_rua, pano_id, heading_direita, "direita", real_lat, real_lon, bairro, nome_rua)
+                tarefas.append((global_idx, dados_dir))
                 global_idx += 1
-                fotos_da_rua += 1
 
+                # Dados para tarefa esquerda
                 if len(tarefas) < TOTAL_IMAGENS_ALVO:
-                    # Foto calçada esquerda
-                    tarefas.append((global_idx, nome_rua, pano_id, heading_esquerda, "esquerda"))
+                    dados_esq = (chave_rua, pano_id, heading_esquerda, "esquerda", real_lat, real_lon, bairro, nome_rua)
+                    tarefas.append((global_idx, dados_esq))
                     global_idx += 1
-                    fotos_da_rua += 1
 
-        print(f"   -> {fotos_da_rua} enquadramentos inéditos adicionados.")
-        if erros_api and fotos_da_rua == 0:
-            print(f"   [AVISO API] Ocorreram erros nesta rua: {list(erros_api)[:2]}")
-
-    if not tarefas:
-        print("\n" + "!" * 75)
-        print("[ERRO] Nenhuma imagem foi encontrada para download!")
-        print("Causas prováveis:")
-        print("1. A sua API_KEY é inválida ou não foi ativada.")
-        print("2. A biblioteca 'Street View Static API' está desativada na sua conta Google Cloud.")
-        print("!" * 75)
-        return
-
-    tarefas = tarefas[:TOTAL_IMAGENS_ALVO]
-    print(f"\nBaixando {len(tarefas)} imagens distintas em paralelo...")
+    print(f"\n[OK] {len(tarefas)} enquadramentos inéditos e metadados preparados.")
+    print("Iniciando downloads e geração de metadados JSON...")
     print("=" * 75)
 
     sucessos = 0
-    falhas = 0
-
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
-            executor.submit(baixar_imagem, idx, rua, pano, hd, lado, PASTA_SAIDA, API_KEY)
-            for idx, rua, pano, hd, lado in tarefas
+            executor.submit(baixar_imagem_e_salvar_metadados, idx, dados, PASTA_SAIDA, API_KEY)
+            for idx, dados in tarefas
         ]
 
         for future in as_completed(futures):
-            sucesso, msg = future.result()
+            sucesso, _ = future.result()
             if sucesso:
                 sucessos += 1
-            else:
-                falhas += 1
 
     print("=" * 75)
-    print("PROCESSAMENTO CONCLUÍDO!")
-    print(f"Fotos salvas com sucesso: {sucessos}")
-    print(f"Pasta de destino:         {os.path.abspath(PASTA_SAIDA)}")
+    print(f"COLETA E METADADOS CONCLUÍDOS!")
+    print(f"{sucessos} imagens + JSONs salvos em: {os.path.abspath(PASTA_SAIDA)}")
     print("=" * 75)
 
 
