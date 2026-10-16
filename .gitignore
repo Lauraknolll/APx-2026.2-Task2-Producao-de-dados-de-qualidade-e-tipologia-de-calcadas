@@ -19,3 +19,5 @@ data/models/*.pt
 sidewalk-tagger-ai/
 data/raw/apx2*/
 data/processed/apx2*/
+
+.ipynb_checkpoints/
