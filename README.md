@@ -177,4 +177,63 @@ chore(deps): atualiza pandas para 2.1.0
 - **Estudantes:** manter o Board atualizado diariamente
 - **IPPUC:** acompanhar pelo Board o andamento
 
+
+## Executar com Docker — CPU
+
+### Pré-requisitos
+
+- Docker Desktop instalado e em execução.
+- Terminal aberto na pasta que contém o compose.yaml.
+
+### Construir a imagem
+
+```bash
+docker buildx build --load -t apx-sidewalk:cpu .
+```
+
+A primeira construção pode demorar devido ao download das dependências.
+
+### Iniciar o ambiente
+
+```bash
+docker compose up -d
+docker compose logs notebook
+```
+
+Abra no navegador o endereço dos logs que contém
+127.0.0.1:8888 e o token de acesso.
+
+Abra o notebook 01-poc_inferencia_sidewalk.ipynb.
+
+### Dados e pesos do modelo
+
+As pastas data/ e notebooks/ são compartilhadas com o container.
+Alterações nessas pastas permanecem no computador.
+
+Para executar a inferência, disponibilize:
+
+- data/models/dinov2_base_sidewalk.pth
+- data/raw/amostras_metadata.csv
+- Imagens correspondentes em data/raw/amostras/
+
+Os pesos devem ser obtidos com a equipe do projeto.
+Este ambiente utiliza CPU.
+
+### Encerrar o ambiente
+
+Salve o notebook antes de executar:
+
+```bash
+docker compose down
+```
+
+### Validação realizada
+
+- Construção e carregamento da imagem Docker.
+- Importação do PyTorch e do modelo local.
+- Inicialização do Jupyter pelo Docker Compose.
+- Leitura do CSV e localização das 10 imagens de teste.
+
+A inferência completa ainda não foi validada:
+o arquivo de pesos do modelo não estava disponível.
 ---
