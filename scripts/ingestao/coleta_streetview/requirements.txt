@@ -18,8 +18,9 @@ coordinatesconverter
 pyexiv2
 pycryptodome
 
-# Segmentação (SegFormer). Para usar a GPU, instale o torch com CUDA:
-# https://pytorch.org/get-started/locally/
+# Segmentação (SegFormer). Para usar a GPU:
+# - NVIDIA (CUDA): https://pytorch.org/get-started/locally/
+# - AMD/Intel no Windows (DirectML, Python <= 3.12): pip install torch-directml "transformers<5.0"
 torch
 torchvision
 transformers

@@ -30,9 +30,10 @@ no ambiente Docker dos notebooks.
 - A [streetlevel](https://github.com/sk-zk/streetlevel) vai com `--no-deps`
   porque uma dependência dela (`pyfrpc`, só usada para o Mapy.cz) não compila
   no Python 3.14; as outras estão no `requirements.txt`.
-- O `torch` instalado assim roda na CPU. Para a segmentação usar a GPU,
-  instale o build com CUDA (<https://pytorch.org/get-started/locally/>) — o
-  código usa a GPU sozinho quando ela está disponível.
+- O `torch` instalado assim roda na CPU. Para a segmentação usar a GPU:
+  - **NVIDIA (CUDA):** instale o build com CUDA (<https://pytorch.org/get-started/locally/>).
+  - **AMD/Intel no Windows (DirectML):** instale `pip install torch-directml "transformers<5.0"`.
+  O código detecta e usa a GPU sozinho (`cuda` ou `directml`) quando disponível.
 - Na primeira segmentação, o modelo (~210 MB) é baixado do Hugging Face e
   fica em cache.
 

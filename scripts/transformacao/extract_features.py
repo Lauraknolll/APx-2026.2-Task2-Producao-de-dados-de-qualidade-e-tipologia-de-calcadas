@@ -1,10 +1,14 @@
 import os
+import sys
 import json
 import torch
 import numpy as np
 from PIL import Image
 from transformers import AutoImageProcessor, AutoModel
 from tqdm import tqdm
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from scripts.utils.device import get_device
 
 def process_split(split_name, base_dir, processor, model, device):
     split_dir = os.path.join(base_dir, split_name)
@@ -103,7 +107,7 @@ def main():
         
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device()
     print(f"Iniciando extração. Usando dispositivo: {device}")
     
     print(f"Baixando/Carregando modelo '{MODEL_ID}' do HuggingFace...")
