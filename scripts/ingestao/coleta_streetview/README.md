@@ -9,7 +9,7 @@ Para cada rua, o pipeline divide as calçadas da camada do IPPUC em **zonas de
 **close da calçada** (da guia ao alinhamento dos prédios), corta o close em
 **3 quadrados** e guarda só os quadrados em que uma IA de segmentação confirma
 **calçada sem obstrução**. O resultado de cada rua fica em
-`downloads-ruas/<rua>/`, com um `indice.csv` que liga cada foto às
+`data/processed/downloads-ruas/<rua>/`, com um `indice.csv` que liga cada foto às
 coordenadas e ao panorama de origem. É a etapa de coleta: a avaliação da
 qualidade da calçada (tipologia e defeitos) vem depois e usa essas imagens.
 
@@ -139,7 +139,7 @@ fica sem foto (`recoleta`).
 
 ## Resultado
 
-`downloads-ruas/<rua>/` tem sempre a **coleta mais recente** da rua — é
+`data/processed/downloads-ruas/<rua>/` tem sempre a **coleta mais recente** da rua — é
 sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 
 - `<zona>_<tentativa>_<quadrado>.jpg` — os quadrados de calçada limpos

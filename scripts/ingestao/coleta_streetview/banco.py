@@ -23,7 +23,7 @@ avalia é a calçada como está hoje); na mesma data, a com mais quadrados
 limpos e, depois, a de melhor nota. Só lê e grava o banco — não baixa nem
 segmenta —, o que permite recalibrar os limites com `reavaliar`.
 
-Resultado — downloads-ruas/<rua>/: só os quadrados limpos da vista escolhida
+Resultado — data/processed/downloads-ruas/<rua>/: só os quadrados limpos da vista escolhida
 de cada zona aprovada (<zona>_<tentativa>_<quadrado>.jpg) e um indice.csv
 que liga cada foto à zona, às coordenadas e ao panorama de origem. A pasta é
 sincronizada com o banco a cada rodada: o que deixou de valer sai.
@@ -97,6 +97,16 @@ ESQUEMA = """
     CREATE TABLE IF NOT EXISTS parametros (
         chave TEXT PRIMARY KEY,
         valor TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS uploads_roboflow (
+        arquivo     TEXT PRIMARY KEY,             -- ex: "1_4_1.jpg"
+        ponto_id    INTEGER NOT NULL,
+        tentativa   INTEGER NOT NULL,
+        quadrado    INTEGER NOT NULL,
+        rua_slug    TEXT NOT NULL,
+        batch_name  TEXT NOT NULL,
+        enviado_em  TEXT NOT NULL                 -- ISO timestamp
     );
 """
 
@@ -244,13 +254,24 @@ def pasta_da_rua(rua: str) -> Path:
     return PASTA_RUAS / "-".join("".join(c if c.isalnum() else " " for c in sem_acento.lower()).split())
 
 
+def sincronizar_pasta_imagens(pasta: Path, desejados: dict[str, Path]):
+    """Garante que `pasta` tenha exatamente os arquivos `.jpg` de `desejados`."""
+    pasta.mkdir(parents=True, exist_ok=True)
+    for arquivo in pasta.glob("*.jpg"):
+        if arquivo.name not in desejados:
+            arquivo.unlink()
+    for nome, origem in desejados.items():
+        if not (pasta / nome).exists() and origem.exists():
+            shutil.copy2(origem, pasta / nome)
+
+
 def exportar_ruas(conn: sqlite3.Connection) -> dict[str, int]:
     """Sincroniza downloads-ruas/<rua>/ de todas as ruas; retorna quadrados por rua."""
     contagem = {}
     for (rua,) in conn.execute("SELECT DISTINCT rua FROM pontos_rua").fetchall():
         pasta = pasta_da_rua(rua)
         pasta.mkdir(parents=True, exist_ok=True)
-        desejados, linhas = {}, []
+        desejados, closes_desejados, ctx_desejados, linhas = {}, {}, {}, []
         for pid, tentativa, limpos, endereco, data, pano, alat, alon, quadrados in conn.execute("""
                 SELECT p.id, p.tentativa, p.quadrados, p.endereco, t.data, t.pano_id, t.alvo_lat,
                        t.alvo_lon, t.quadrados
@@ -259,6 +280,9 @@ def exportar_ruas(conn: sqlite3.Connection) -> dict[str, int]:
                 WHERE r.rua = ? AND p.status = 'aprovada' AND p.quadrados IS NOT NULL
                 ORDER BY p.id""", (rua,)):
             medidas = json.loads(quadrados) if quadrados else []
+            nome_vista = f"{pid}_{tentativa}.jpg"
+            closes_desejados[nome_vista] = PASTA_IMAGENS / nome_vista
+            ctx_desejados[nome_vista] = PASTA_IMAGENS / "contexto" / nome_vista
             for k in map(int, limpos.split(",")):
                 nome = f"{pid}_{tentativa}_{k}.jpg"
                 desejados[nome] = PASTA_IMAGENS / "quadrados" / nome
@@ -268,12 +292,9 @@ def exportar_ruas(conn: sqlite3.Connection) -> dict[str, int]:
                                "piso": m["piso"],
                                "obstrucao": round(sum(m["obstrucao"].get(t, 0) for t in OBSTRUCAO_NA_FRENTE), 3),
                                "pano_id": pano})
-        for arquivo in pasta.glob("*.jpg"):
-            if arquivo.name not in desejados:
-                arquivo.unlink()
-        for nome, origem in desejados.items():
-            if not (pasta / nome).exists() and origem.exists():
-                shutil.copy2(origem, pasta / nome)
+        sincronizar_pasta_imagens(pasta, desejados)
+        sincronizar_pasta_imagens(pasta / "closes", closes_desejados)
+        sincronizar_pasta_imagens(pasta / "contexto", ctx_desejados)
         with open(pasta / "indice.csv", "w", newline="", encoding="utf-8") as f:
             escritor = csv.DictWriter(f, fieldnames=CAMPOS_INDICE)
             escritor.writeheader()

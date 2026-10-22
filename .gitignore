@@ -20,4 +20,8 @@ sidewalk-tagger-ai/
 data/raw/apx2*/
 data/processed/apx2*/
 
+# Dados processados intermediários pesados (rascunhos e camada extraída do zip)
+data/processed/passeio.gpkg
+data/processed/streetview/
+
 .ipynb_checkpoints/
