@@ -160,15 +160,10 @@ sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 | Módulo | Responsabilidade |
 |---|---|
 | [config.py](config.py) | Constantes e caminhos (ruas do menu, tamanho das zonas, limites do filtro...) |
-| [geometria.py](geometria.py) | Leitura do GeoPackage, conversão lat/lon ↔ UTM, linha central das calçadas |
-| [osm.py](osm.py) | Traçado das ruas no OpenStreetMap (Overpass), com cache |
-| [banco.py](banco.py) | Banco SQLite com o estado do pipeline (esquema e migrações) |
+| [geometria.py](geometria.py) | Camada de calçadas (GeoPackage, lat/lon ↔ UTM, linha central) e traçado das ruas (OpenStreetMap, com cache) |
 | [streetview.py](streetview.py) | Panoramas do Google e recorte de vistas em perspectiva a partir dos tiles |
-| [coleta.py](coleta.py) | Etapa 1: zonas e vistas candidatas |
-| [recorte.py](recorte.py) | Etapa 2: closes, quadrados e vistas de contexto |
-| [segmentacao.py](segmentacao.py) | Etapa 3: piso e obstrução de cada quadrado |
-| [selecao.py](selecao.py) | Filtro dos quadrados e escolha da vista de cada zona |
-| [exportacao.py](exportacao.py) | `downloads-ruas/<rua>/` e o `indice.csv` |
+| [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `downloads-ruas/<rua>/` e o `indice.csv` |
+| [etapas.py](etapas.py) | As etapas: 1. `coletar` (zonas e vistas candidatas), 2. `baixar` (closes, quadrados, vistas de contexto), 3. `segmentar` (piso e obstrução de cada quadrado) e `reavaliar` |
 | [cli.py](cli.py) | Menu interativo e subcomandos |
 
 Cada módulo abre com uma docstring que explica o que faz e como.
@@ -183,7 +178,7 @@ Cada módulo abre com uma docstring que explica o que faz e como.
 | `parametros` | O tamanho das zonas. |
 
 A etapa de avaliação pode recusar a vista escolhida de uma zona com
-`scripts.ingestao.coleta_streetview.selecao.registrar_rejeicao(conn, zona, motivo)`: a zona passa para
+`scripts.ingestao.coleta_streetview.banco.registrar_rejeicao(conn, zona, motivo)`: a zona passa para
 a melhor reserva e a vista recusada nunca mais é escolhida.
 
 ### Arquivos de trabalho

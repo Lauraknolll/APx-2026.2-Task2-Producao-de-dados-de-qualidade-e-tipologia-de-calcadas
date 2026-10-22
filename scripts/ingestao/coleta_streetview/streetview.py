@@ -4,7 +4,8 @@ Acesso ao Google Street View.
 Os metadados (panorama mais próximo, panorama por id, capturas históricas)
 vêm da biblioteca streetlevel, que usa as APIs internas do Google Maps — as
 mesmas do navegador: não precisa de chave nem é cobrado, mas pode quebrar se
-o Google mudar algo. https://github.com/sk-zk/streetlevel
+o Google mudar algo, e consultas demais seguidas levam a bloqueio temporário
+do IP (`com_retry`). https://github.com/sk-zk/streetlevel
 
 As imagens não passam pela streetlevel: `renderizar` baixa direto do
 servidor de tiles só os blocos de 512 px que uma vista usa e monta a vista
@@ -13,13 +14,32 @@ em perspectiva.
 
 import io
 import math
+import sys
+import time
 from typing import Optional
 
 import requests
 
 from . import geometria
 from .config import ALTURA_CAMERA, DIST_MAX, DIST_MIN
-from .util import com_retry
+
+def com_retry(funcao, *args, max_tentativas: int = 5, **kwargs):
+    """
+    Chama `funcao` repetindo com espera exponencial (1, 2, 4, 8, 16 s). Se
+    nunca der certo, o mais provável é o Google ter bloqueado o IP por um
+    tempo — melhor parar e rodar de novo mais tarde.
+    """
+    for tentativa in range(max_tentativas):
+        try:
+            return funcao(*args, **kwargs)
+        except Exception as exc:
+            espera = 2 ** tentativa
+            print(f"  ! {type(exc).__name__}: {str(exc)[:150]} — tentando de novo em {espera}s",
+                  file=sys.stderr)
+            time.sleep(espera)
+    raise RuntimeError(f"Street View falhou {max_tentativas} vezes seguidas; "
+                       "pode ser bloqueio temporário. Rode de novo mais tarde.")
+
 
 TILE_URL = ("https://streetviewpixels-pa.googleapis.com/v1/tile?cb_client=maps_sv.tactile"
             "&panoid={}&x={}&y={}&zoom={}")

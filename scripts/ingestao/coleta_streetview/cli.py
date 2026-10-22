@@ -19,12 +19,8 @@ from pathlib import Path
 from typing import Optional
 
 from . import config
-from .banco import abrir_db
-from .coleta import cmd_coletar, zonas_da_rua
-from .exportacao import exportar_ruas, pasta_da_rua, resumo_exportacao
-from .recorte import cmd_baixar
-from .segmentacao import cmd_segmentar
-from .selecao import cmd_reavaliar
+from .banco import abrir_db, exportar_ruas, pasta_da_rua, resumo_exportacao
+from .etapas import cmd_baixar, cmd_coletar, cmd_reavaliar, cmd_segmentar, zonas_da_rua
 
 # --------------------------------------------------------------------------- #
 # Fluxo completo de uma rua (modo interativo)
