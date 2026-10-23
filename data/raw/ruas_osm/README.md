@@ -1,13 +1,21 @@
 # Traçados de ruas — OpenStreetMap
 
-Cache dos traçados de ruas usados pela coleta do Street View
-(`scripts/ingestao/coleta_streetview`) para separar as calçadas de cada rua.
+Nomes e traçados das ruas de Curitiba usados pela coleta do Street View
+(`scripts/ingestao/coleta_streetview`) para achar a rua digitada e separar as
+calçadas dela das outras.
 
-- **Fonte:** OpenStreetMap, via API Overpass (vias `highway` com o nome da rua,
-  dentro do município de Curitiba). Dados © colaboradores do OpenStreetMap,
-  licença ODbL.
-- **Obtenção:** automática, na primeira vez que uma rua é coletada; outubro de 2026.
-- **Formato:** um JSON por rua, `{"nome": <nome oficial no OSM>, "trechos": [[[lat, lon], ...], ...]}`
-  (WGS84), um trecho por via (`way`) do OSM.
+- **Fonte:** OpenStreetMap, via API Overpass (vias `highway` com nome, exceto
+  plataformas de ônibus, dentro do município de Curitiba). Dados ©
+  colaboradores do OpenStreetMap, licença ODbL.
+- **Obtenção:** automática; outubro de 2026.
 
-Ruas novas entram aqui sozinhas quando são coletadas pela primeira vez.
+## Arquivos
+
+- `_vias_curitiba.json.gz` — todas as vias com nome, baixadas numa consulta
+  só: `{"fonte", "obtido": AAAA-MM-DD, "vias": {<nome no OSM>: [trecho, ...]}}`,
+  cada trecho uma lista de `[lat, lon]` (WGS84), um por via (`way`) do OSM. É
+  nele que o nome digitado é procurado. Apague-o para baixar o OSM de novo.
+- `<rua>.json` — o traçado de uma rua, congelado na primeira vez que ela é
+  coletada (as zonas da rua não mudam se o OSM mudar):
+  `{"nome": <nome oficial no OSM>, "trechos": [[[lat, lon], ...], ...]}`. O
+  arquivo tem o nome sem acento, em minúsculas.

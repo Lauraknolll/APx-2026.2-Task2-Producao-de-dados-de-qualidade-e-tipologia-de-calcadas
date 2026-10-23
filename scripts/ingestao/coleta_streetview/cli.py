@@ -1,14 +1,16 @@
 """
 Linha de comando: `python -m scripts.ingestao.coleta_streetview`.
 
-Sem argumentos, abre o menu: pergunta a rua (com quantas zonas cada uma tem)
-e quantas zonas rodar, e faz tudo, do começo ao fim (comando `rua`). As
+Sem argumentos, abre o menu: pergunta a rua (qualquer rua de Curitiba, pelo
+nome) e quantas zonas rodar, e faz tudo, do começo ao fim (comando `rua`). As
 etapas continuam disponíveis como subcomandos, para rodar uma de cada vez:
 
     coletar    zonas e vistas candidatas (só metadados)
     baixar     closes, quadrados e vistas de contexto
     segmentar  quadrados limpos, escolha da vista de cada zona, downloads-ruas/
     reavaliar  refaz a escolha com outros limites, sem baixar nem segmentar
+    rotular    gabarito humano dos quadrados, para calibrar o filtro
+    calibrar   varre os limites do filtro contra o gabarito
 """
 
 import argparse
@@ -20,7 +22,9 @@ from typing import Optional
 
 from . import config
 from .banco import abrir_db, exportar_ruas, pasta_da_rua, resumo_exportacao
+from .calibracao import cmd_calibrar, cmd_rotular
 from .etapas import cmd_baixar, cmd_coletar, cmd_reavaliar, cmd_segmentar, zonas_da_rua
+from .geometria import OverpassIndisponivel, RuaAmbigua, RuaNaoEncontrada
 
 # --------------------------------------------------------------------------- #
 # Fluxo completo de uma rua (modo interativo)
@@ -41,18 +45,46 @@ def _situacao(conn: sqlite3.Connection, zonas: list[tuple]) -> dict[tuple, str]:
     return {z[0]: no_banco[z[0]] for z in zonas if z[0] in no_banco}
 
 
-def escolher_rua(conn: sqlite3.Connection) -> str:
-    """Pergunta qual das config.RUAS coletar, com quantas zonas cada uma tem."""
-    print("Qual rua coletar?")
-    for i, rua in enumerate(config.RUAS, 1):
-        _, zonas = zonas_da_rua(rua)
-        feitas = sum(s == "aprovada" for s in _situacao(conn, zonas).values())
-        print(f"  {i}) {rua}; {len(zonas)} zonas" + (f" ({feitas} já com foto)" if feitas else ""))
+def _resolver_rua(texto: str) -> Optional[tuple[str, list[tuple]]]:
+    """(nome no OSM, zonas) da rua digitada, perguntando qual quando o nome
+    casa com várias; None (já explicado na tela) se não der para usar."""
+    try:
+        nome_osm, zonas = zonas_da_rua(texto)
+    except RuaNaoEncontrada as exc:
+        print(f"{exc} Confira a grafia — acentos e abreviações não importam.")
+        return None
+    except OverpassIndisponivel as exc:
+        print(f"{exc}\nOs servidores do OpenStreetMap vivem sobrecarregados; tente de novo em instantes.")
+        return None
+    except RuaAmbigua as exc:
+        if len(exc.nomes) > 15:
+            print(f"{len(exc.nomes)} ruas casam com \"{texto}\"; digite mais do nome.")
+            return None
+        print(exc.titulo)
+        for i, nome in enumerate(exc.nomes, 1):
+            print(f"  {i}) {nome}")
+        resposta = _perguntar(f"Qual? [1-{len(exc.nomes)}, Enter = digitar de novo]: ")
+        if not (resposta.isdigit() and 1 <= int(resposta) <= len(exc.nomes)):
+            return None
+        return _resolver_rua(exc.nomes[int(resposta) - 1])  # nome exato: não volta a ser ambíguo
+    if not zonas:
+        print(f'"{nome_osm}" existe no OpenStreetMap, mas não tem calçadas na camada do IPPUC.')
+        return None
+    return nome_osm, zonas
+
+
+def escolher_rua() -> tuple[str, list[tuple]]:
+    """Pergunta a rua, pelo nome. Retorna (nome no OSM, zonas)."""
+    print("Qual via de Curitiba coletar? Digite o nome completo, com o tipo da via na frente:\n"
+          "  - ex.: Rua Comendador Araújo, Avenida Sete de Setembro, Alameda Dom Pedro II\n"
+          "  - acentos e maiúsculas não importam: \"rua comendador araujo\" serve\n"
+          "  - abreviações valem: R., Av., Al., Tv., Pça., e títulos com ponto (Des., Dr., Prof., Cel.)\n"
+          "  - números como no nome oficial: \"Sete de Setembro\", não \"7 de Setembro\"\n"
+          "  - o que vier depois da vírgula (bairro, cidade) é ignorado")
     while True:
-        resposta = _perguntar(f"Escolha [1-{len(config.RUAS)}]: ")
-        if resposta.isdigit() and 1 <= int(resposta) <= len(config.RUAS):
-            return config.RUAS[int(resposta) - 1]
-        print(f"Digite um número de 1 a {len(config.RUAS)}.")
+        resposta = _perguntar("\n> ")
+        if resposta and (rua := _resolver_rua(resposta)):
+            return rua
 
 
 def perguntar_quantidade(maximo: int) -> Optional[int]:
@@ -80,8 +112,7 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
         vars(etapa_args).update(extra)
         return etapa_args
 
-    nome = args.nome or escolher_rua(conn)
-    nome_osm, zonas = zonas_da_rua(nome)
+    nome_osm, zonas = zonas_da_rua(args.nome) if args.nome else escolher_rua()
     situacao = _situacao(conn, zonas)
     # Sem resultado ainda: nunca coletadas, ou coletadas e não terminadas.
     a_fazer = [z[0] for z in zonas if situacao.get(z[0]) not in ("aprovada", "recoleta")]
@@ -100,7 +131,7 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
 
     t0 = time.time()
     print(f"\n== 1/3 Zonas e panoramas ({len(escolhidas)} zonas)")
-    cmd_coletar(etapa("coletar", "--rua", nome, apenas=set(escolhidas)), conn)
+    cmd_coletar(etapa("coletar", "--rua", nome_osm, apenas=set(escolhidas)), conn)
     conjunto = set(escolhidas)
     ids = [pid for pid, *chave in conn.execute("SELECT id, fid, anel, ordem FROM pontos")
            if tuple(chave) in conjunto]
@@ -110,10 +141,10 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
     # em que nenhuma recente passou no filtro.
     for leva in range(1, 4):
         print(f"\n== 2/3 Closes e quadrados (leva {leva})")
-        if not cmd_baixar(etapa("baixar", "--rua", nome, *so_estas), conn):
+        if not cmd_baixar(etapa("baixar", "--rua", nome_osm, *so_estas), conn):
             break
         print(f"\n== 3/3 Calçada ou não: segmentação dos quadrados (leva {leva})")
-        cmd_segmentar(etapa("segmentar", "--rua", nome, *so_estas), conn)
+        cmd_segmentar(etapa("segmentar", "--rua", nome_osm, *so_estas), conn)
 
     situacao = _situacao(conn, zonas)
     rodadas = [situacao.get(c) for c in escolhidas]
@@ -144,7 +175,7 @@ def criar_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="comando", required=True)
 
     p = sub.add_parser("rua", help="uma rua do começo ao fim (é o que roda sem argumentos)")
-    p.add_argument("--nome", help="nome da rua no OpenStreetMap; sem isso, pergunta qual das ruas conhecidas")
+    p.add_argument("--nome", help='nome da rua, como se escreve ("R. comendador araujo" serve); sem isso, pergunta')
     p.add_argument("--limite", type=int, help="só N zonas, espalhadas pela rua; sem isso, todas as que faltam")
 
     p = sub.add_parser("coletar", help="zonas de calçada e vistas candidatas (só metadados)")
@@ -194,7 +225,17 @@ def criar_parser() -> argparse.ArgumentParser:
         p.add_argument("--max-obstrucao", type=float, default=config.MAX_OBSTRUCAO,
                        help="fração máxima do quadrado tampada por veículos, pessoas ou pelo borrão "
                             f"do carro do Google (default: {config.MAX_OBSTRUCAO})")
-    for p in (baixar, segmentar):
+    rotular = sub.add_parser("rotular", help="gabarito humano: rótulo de cada quadrado segmentado, numa janela")
+    rotular.add_argument("--limite", type=int, help="só N quadrados nesta sessão")
+    rotular.add_argument("--autor", help="quem está rotulando (gravado com cada rótulo)")
+    calibrar = sub.add_parser("calibrar", help="varre os limites do filtro contra o gabarito")
+    calibrar.add_argument("--beta", type=float, default=2.0,
+                          help="peso do recall sobre a precisão na escolha do limite (default: 2)")
+    calibrar.add_argument("--precisao-min", type=float, default=0.9,
+                          help="fração mínima das fotos aprovadas que devem ser calçada avaliável (default: 0.9)")
+    calibrar.add_argument("--listar", type=int, default=15,
+                          help="quantas calçadas boas descartadas listar (default: 15)")
+    for p in (baixar, segmentar, rotular, calibrar):
         p.add_argument("--rua", help="só as zonas de uma rua já coletada com coletar --rua")
         p.add_argument("--zonas", help="só estas zonas (ids separados por vírgula)")
 
@@ -210,4 +251,5 @@ def main(argv: Optional[list[str]] = None):
         cmd_rua(args, conn, parser)
     else:
         {"coletar": cmd_coletar, "baixar": cmd_baixar, "segmentar": cmd_segmentar,
-         "reavaliar": cmd_reavaliar}[args.comando](args, conn)
+         "reavaliar": cmd_reavaliar, "rotular": cmd_rotular,
+         "calibrar": cmd_calibrar}[args.comando](args, conn)

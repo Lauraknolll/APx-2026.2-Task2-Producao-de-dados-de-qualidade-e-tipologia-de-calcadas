@@ -14,6 +14,8 @@ tudo retomável: interromper e rodar de novo continua de onde parou.
     pontos_rua  a que rua (nome do OSM) cada zona pertence; uma zona de
                 esquina pode estar em duas.
     parametros  o espaçamento das zonas (muda a identidade delas).
+    rotulos     o gabarito humano de cada quadrado, para calibrar o filtro
+                (calibracao.py).
 
 Escolha da vista — um quadrado é LIMPO quando tem piso de calçada >=
 MIN_CALCADA e obstrução na frente (veículo + pessoa + borrão do carro) <=
@@ -97,6 +99,16 @@ ESQUEMA = """
     CREATE TABLE IF NOT EXISTS parametros (
         chave TEXT PRIMARY KEY,
         valor TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS rotulos (          -- gabarito humano (calibracao.py)
+        ponto_id  INTEGER NOT NULL,
+        posicao   INTEGER NOT NULL,
+        quadrado  INTEGER NOT NULL,               -- 1..3, da esquerda para a direita
+        rotulo    TEXT NOT NULL,                  -- calibracao.ROTULOS
+        autor     TEXT,
+        quando    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (ponto_id, posicao, quadrado)
     );
 """
 

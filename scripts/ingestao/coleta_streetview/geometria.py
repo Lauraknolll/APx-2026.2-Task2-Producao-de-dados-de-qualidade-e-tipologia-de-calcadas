@@ -7,17 +7,20 @@ Geometria: a camada de calçadas do IPPUC e o traçado das ruas.
   convertemos tudo para UTM e fazemos a geometria em metros (SIRGAS 2000 e
   WGS84 diferem em centímetros, o que é irrelevante aqui). A `LinhaCentral`
   de cada calçada é o que se divide em zonas.
-- Ruas: traçado do OpenStreetMap (API Overpass), só para separar as calçadas
-  de uma rua das outras; os traçados consultados ficam em cache em
-  data/raw/ruas_osm/.
+- Ruas: nomes e traçados do OpenStreetMap, para achar a rua digitada e
+  separar as calçadas dela das outras. Todas as vias de Curitiba são baixadas
+  de uma vez (API Overpass) para data/raw/ruas_osm/, e a busca é local.
 """
 
+import difflib
+import gzip
 import json
 import math
 import shutil
 import sqlite3
 import struct
-import sys
+import time
+import unicodedata
 import zipfile
 from pathlib import Path
 from typing import Iterator, Optional
@@ -267,50 +270,167 @@ class LinhaCentral:
 # Ruas (OpenStreetMap)
 # --------------------------------------------------------------------------- #
 
+class RuaNaoEncontrada(SystemExit):
+    """Nenhuma rua de Curitiba casa com o nome. Fora do menu, encerra com a mensagem."""
+
+
+class OverpassIndisponivel(SystemExit):
+    """Nenhum servidor Overpass respondeu (vivem sobrecarregados). Fora do menu, encerra."""
+
+
+class RuaAmbigua(SystemExit):
+    """O nome não leva a uma rua só; `nomes` traz as candidatas e `titulo`
+    explica por quê (várias casam, ou nenhuma casa e estas são parecidas)."""
+
+    def __init__(self, nomes: list[str], titulo: str = "Mais de uma rua casa com esse nome:"):
+        super().__init__(titulo + "\n  " + "\n  ".join(nomes))
+        self.nomes, self.titulo = nomes, titulo
+
+
+# Abreviações comuns no nome digitado. Tipos de via valem só na 1ª palavra,
+# com ou sem ponto ("R. XV", "Av Batel"); títulos, só com ponto ("Des. Motta").
+_TIPOS = {"r": "Rua", "av": "Avenida", "al": "Alameda", "tv": "Travessa", "trav": "Travessa",
+          "pç": "Praça", "pca": "Praça", "pça": "Praça", "rod": "Rodovia", "lgo": "Largo"}
+_TITULOS = {"dr": "Doutor", "dra": "Doutora", "prof": "Professor", "profa": "Professora",
+            "des": "Desembargador", "cel": "Coronel", "gen": "General", "gal": "General",
+            "com": "Comendador", "eng": "Engenheiro", "sen": "Senador", "dep": "Deputado",
+            "pres": "Presidente", "mal": "Marechal", "ten": "Tenente", "cap": "Capitão",
+            "pe": "Padre", "sta": "Santa", "sto": "Santo", "visc": "Visconde", "bar": "Barão"}
+VIAS_CURITIBA = CACHE_RUAS / "_vias_curitiba.json.gz"  # todas as vias com nome, de uma vez
+
+
+def _sem_acento(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
+
+
+def _chave(nome: str) -> str:
+    """Forma de comparar nomes: sem acento, minúsculas, espaços simples."""
+    return " ".join(_sem_acento(nome).lower().split())
+
+
+def normalizar_nome(nome: str) -> str:
+    """O nome como alguém digitaria -> o mais perto do OSM: corta o que vem
+    depois da vírgula (bairro, cidade) e expande as abreviações."""
+    palavras = nome.split(",")[0].split()
+    for k, palavra in enumerate(palavras):
+        chave = palavra.rstrip(".").lower()
+        if k == 0 and chave in _TIPOS:
+            palavras[k] = _TIPOS[chave]
+        elif palavra.endswith(".") and chave in _TITULOS:
+            palavras[k] = _TITULOS[chave]
+    return " ".join(palavras)
+
+
+_vias: Optional[dict[str, list]] = None
+
+
+def vias_de_curitiba() -> dict[str, list]:
+    """
+    {nome no OSM: trechos} de todas as vias com nome de Curitiba, cada trecho
+    uma lista de [lat, lon]. Baixadas numa consulta só ao Overpass (~1 min,
+    ~1 MB compactado) e guardadas em VIAS_CURITIBA: daí em diante, achar uma
+    rua e o traçado dela é local e instantâneo. Consultar o Overpass rua a
+    rua não serve — os servidores públicos vivem sobrecarregados e levam de
+    30 s a minutos até para um nome exato, quando respondem. Apague o arquivo
+    para baixar o OSM de novo.
+    """
+    global _vias
+    if _vias is None and VIAS_CURITIBA.exists():
+        _vias = json.loads(gzip.decompress(VIAS_CURITIBA.read_bytes()))["vias"]
+    if _vias is not None:
+        return _vias
+
+    print("Baixando as ruas de Curitiba do OpenStreetMap (só na primeira vez, ~1 min)...", flush=True)
+    query = ('[out:json][timeout:300]; area["name"="Curitiba"]["admin_level"="8"]->.cwb; '
+             'way["highway"]["highway"!="platform"]["name"](area.cwb); out tags geom;')
+    falhas = []
+    for url in OVERPASS_URLS:
+        try:
+            resp = requests.post(url, data={"data": query},
+                                 headers={"User-Agent": "calcadas-curitiba/0.1"}, timeout=400)
+            resp.raise_for_status()
+            elementos = resp.json().get("elements", [])
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            falhas.append(f"{url}: {exc}")
+            continue
+        if len(elementos) > 1000:  # menos que isso: resposta truncada no meio
+            break
+        falhas.append(f"{url}: resposta incompleta ({len(elementos)} vias)")
+    else:
+        raise OverpassIndisponivel("Nenhum servidor Overpass respondeu:\n  " + "\n  ".join(falhas))
+
+    vias: dict[str, list] = {}
+    for w in elementos:
+        vias.setdefault(w["tags"]["name"], []).append([[round(p["lat"], 6), round(p["lon"], 6)]
+                                                        for p in w["geometry"]])
+    CACHE_RUAS.mkdir(parents=True, exist_ok=True)
+    dados = {"fonte": "OpenStreetMap (ODbL), via Overpass", "obtido": time.strftime("%Y-%m-%d"), "vias": vias}
+    VIAS_CURITIBA.write_bytes(gzip.compress(json.dumps(dados, ensure_ascii=False, separators=(",", ":")).encode()))
+    _vias = vias
+    return vias
+
+
+def _grafia(grafias: list[str]) -> str:
+    """A grafia de uma rua entre as variantes do OSM: a mais comum entre os
+    trechos; no empate, a acentuada."""
+    return max(set(grafias), key=lambda g: (grafias.count(g), g != _sem_acento(g), g))
+
+
+def identificar_rua(nome: str) -> list[str]:
+    """
+    As grafias, no OSM, da rua que o nome digitado indica. O OSM às vezes
+    grafa a mesma rua de dois jeitos em trechos diferentes ("Isaias" e
+    "Isaías"): nomes iguais a menos de acento e maiúscula são uma rua só.
+    Tenta o nome exato e depois "contém"; sem nada, sugere os parecidos.
+    """
+    nome = normalizar_nome(nome)
+    chave = _chave(nome)
+    ruas: dict[str, list[str]] = {}
+    for n in vias_de_curitiba():
+        ruas.setdefault(_chave(n), []).append(n)
+    if chave in ruas:
+        return ruas[chave]
+    contem = [c for c in ruas if chave in c]
+    if len(contem) == 1:
+        return ruas[contem[0]]
+    if contem:
+        raise RuaAmbigua(sorted(_grafia(ruas[c]) for c in contem))
+    parecidas = difflib.get_close_matches(chave, list(ruas), n=8, cutoff=0.75)
+    if parecidas:
+        raise RuaAmbigua([_grafia(ruas[c]) for c in parecidas],
+                         f'Nenhuma rua de Curitiba se chama "{nome}". Você quis dizer:')
+    raise RuaNaoEncontrada(f'Nenhuma rua encontrada em Curitiba com o nome "{nome}".')
+
+
+def _cache_rua(nome: str) -> Path:
+    return CACHE_RUAS / (_sem_acento(nome).lower().replace("/", "_") + ".json")
+
+
 def buscar_rua(nome: str) -> tuple[str, list[list[tuple]]]:
     """
     (nome oficial no OSM, trechos), cada trecho uma lista de (lat, lon).
 
-    Tenta o nome exato (sem diferenciar maiúsculas); se não achar, busca por
-    "contém" — e, se isso casar com mais de uma rua, pede para ser mais
-    específico. O nome é o do OSM, por extenso ("Avenida", não "Av.").
+    Aceita o nome como se escreve: sem acento, em minúsculas, abreviado ("R.
+    comendador araujo") e com bairro ou cidade depois da vírgula (veja
+    `identificar_rua`). Sem rua: RuaNaoEncontrada; com várias candidatas:
+    RuaAmbigua. O traçado sai de `vias_de_curitiba` e é congelado num JSON
+    por rua: as zonas de uma rua já coletada não mudam se o OSM mudar.
     """
-    cache = CACHE_RUAS / (nome.strip().lower().replace("/", "_") + ".json")
+    cache = _cache_rua(normalizar_nome(nome))
     if cache.exists():
         dados = json.loads(cache.read_text(encoding="utf-8"))
         return dados["nome"], [[tuple(p) for p in t] for t in dados["trechos"]]
 
-    def consultar(filtro: str) -> list[dict]:
-        query = f"""[out:json][timeout:60];
-            area["name"="Curitiba"]["admin_level"="8"]->.cwb;
-            way["highway"]["name"~"{filtro}",i](area.cwb);
-            out geom;"""
-        falhas = []
-        for url in OVERPASS_URLS:
-            try:
-                resp = requests.post(url, data={"data": query},
-                                     headers={"User-Agent": "calcadas-curitiba/0.1"}, timeout=90)
-                resp.raise_for_status()
-                return resp.json().get("elements", [])
-            except (requests.exceptions.RequestException, ValueError) as exc:
-                falhas.append(f"{url}: {exc}")
-        sys.exit("Nenhum servidor Overpass respondeu:\n  " + "\n  ".join(falhas))
-
-    escapado = "".join(f"\\\\{c}" if c in r'\.^$|?*+()[]{}"' else c for c in nome.strip())
-    ways = consultar(f"^{escapado}$") or consultar(escapado)
-    if not ways:
-        sys.exit(f'Nenhuma rua encontrada em Curitiba com o nome "{nome}".')
-
-    nomes = sorted({w["tags"]["name"] for w in ways})
-    if len(nomes) > 1:
-        sys.exit("Mais de uma rua casou com esse nome, use o nome completo:\n  "
-                 + "\n  ".join(nomes))
-
-    trechos = [[(p["lat"], p["lon"]) for p in w["geometry"]] for w in ways]
+    vias = vias_de_curitiba()
+    grafias = identificar_rua(nome)
+    oficial = _grafia([g for g in grafias for _ in vias[g]])  # a grafia com mais trechos
+    trechos = [[tuple(p) for p in t] for g in grafias for t in vias[g]]
     CACHE_RUAS.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps({"nome": nomes[0], "trechos": trechos}, ensure_ascii=False),
-                     encoding="utf-8")
-    return nomes[0], trechos
+    dados = json.dumps({"nome": oficial, "trechos": trechos}, ensure_ascii=False)
+    # Também sob o nome oficial: as etapas seguintes buscam por ele.
+    for arquivo in {cache, _cache_rua(oficial)}:
+        arquivo.write_text(dados, encoding="utf-8")
+    return oficial, trechos
 
 
 def _para_metros(lat: float, lon: float, lat_ref: float) -> tuple[float, float]:

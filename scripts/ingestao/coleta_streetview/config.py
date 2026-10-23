@@ -26,13 +26,11 @@ PASTA_RUAS = RAIZ / "downloads-ruas"                        # resultado: downloa
 # Ruas e zonas
 # --------------------------------------------------------------------------- #
 
-# Ruas oferecidas no menu interativo (nome do OpenStreetMap, por extenso).
-RUAS = ["Avenida Silva Jardim", "Avenida Sete de Setembro"]
-
 # Bounding box aproximado do município (lon_min, lat_min, lon_max, lat_max).
 CURITIBA_BBOX = (-49.3900, -25.6450, -49.1850, -25.3450)
 
-# Servidores públicos do Overpass (OSM); o principal vive sobrecarregado,
+# Servidores públicos do Overpass (OSM), usados só para baixar as vias de
+# Curitiba (geometria.vias_de_curitiba); o principal vive sobrecarregado,
 # então tentamos os espelhos em sequência.
 OVERPASS_URLS = [
     "https://overpass-api.de/api/interpreter",

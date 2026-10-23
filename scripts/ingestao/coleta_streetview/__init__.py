@@ -9,9 +9,10 @@ repositório com `python -m scripts.ingestao.coleta_streetview`.
 
 Módulos:
     config      constantes e caminhos
-    geometria   camada de calçadas (GeoPackage, UTM, linha central) e traçado das ruas (OSM)
+    geometria   camada de calçadas (GeoPackage, UTM, linha central) e busca das ruas pelo nome (OSM)
     streetview  panoramas do Google e recorte de vistas em perspectiva
     banco       estado no SQLite, escolha da vista de cada zona e downloads-ruas/
     etapas      coletar, baixar, segmentar e reavaliar
+    calibracao  gabarito humano dos quadrados e varredura dos limites do filtro
     cli         menu interativo e subcomandos
 """

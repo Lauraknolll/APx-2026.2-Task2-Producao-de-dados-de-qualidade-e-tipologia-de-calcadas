@@ -41,8 +41,13 @@ no ambiente Docker dos notebooks.
 Nenhum passo manual: a **camada de calçadas do IPPUC** (`passeio.gpkg`,
 SIRGAS 2000 / UTM 22S) já está no repositório, zipada em
 `data/raw/_Passeio_CWB.zip`, e é extraída para `data/processed/passeio.gpkg`
-no primeiro uso. Os traçados das ruas vêm do OpenStreetMap e ficam em cache em
-`data/raw/ruas_osm/` (as ruas do menu já estão lá).
+no primeiro uso. Os nomes e traçados das ruas vêm do **OpenStreetMap**, também
+já no repositório: `data/raw/ruas_osm/_vias_curitiba.json.gz` (~1 MB) tem
+todas as vias com nome de Curitiba, e achar uma rua nele é instantâneo e não
+usa rede. Ao ser coletada, cada rua ganha um JSON próprio na mesma pasta, que
+congela o traçado dela — as zonas não mudam se o OSM mudar. Para atualizar as
+vias, apague o `.json.gz`: ele é baixado de novo (uma consulta ao Overpass,
+~1 min).
 
 ## Como usar
 
@@ -53,29 +58,56 @@ Sempre da raiz do repositório:
 ```
 
 ```
-Qual rua coletar?
-  1) Avenida Silva Jardim; 179 zonas (7 já com foto)
-  2) Avenida Sete de Setembro; 271 zonas (20 já com foto)
-Escolha [1-2]: 1
+Qual via de Curitiba coletar? Digite o nome completo, com o tipo da via na frente:
+  - ex.: Rua Comendador Araújo, Avenida Sete de Setembro, Alameda Dom Pedro II
+  - acentos e maiúsculas não importam: "rua comendador araujo" serve
+  - abreviações valem: R., Av., Al., Tv., Pça., e títulos com ponto (Des., Dr., Prof., Cel.)
+  - números como no nome oficial: "Sete de Setembro", não "7 de Setembro"
+  - o que vier depois da vírgula (bairro, cidade) é ignorado
 
-"Avenida Silva Jardim": 179 zonas, 7 já processadas, 172 a processar.
-Quantas zonas rodar? [1-172, Enter = todas]: 3
+> rua comendador araujo
+
+"Rua Comendador Araújo": 51 zonas, 0 já processadas, 51 a processar.
+Quantas zonas rodar? [1-51, Enter = todas]: 3
 ...
-Pronto: 3 zonas da "Avenida Silva Jardim" em 3 min — 3 com foto, 0 sem foto boa.
-  Na rua: 10 de 179 zonas com foto; 25 quadrados de calçada em downloads-ruas\avenida-silva-jardim/
+Pronto: 3 zonas da "Rua Comendador Araújo" em 3 min — 3 com foto, 0 sem foto boa.
 ```
 
-- A quantidade vale para as zonas **ainda sem resultado**, escolhidas
-  espalhadas pela rua, e limita tudo — inclusive a consulta aos panoramas.
-  Enter roda todas as que faltam.
-- Pode ser interrompido (Ctrl+C) e rodado de novo: continua de onde parou.
-- Sem perguntas: `python -m scripts.ingestao.coleta_streetview rua --nome "Avenida Silva Jardim" --limite 20`.
-- Para oferecer outra rua no menu, acrescente o nome a `RUAS` em
-  [config.py](config.py) — o nome do **OpenStreetMap**, por
-  extenso ("Avenida", não "Av.").
+**A rua.** Qualquer via de Curitiba que tenha calçadas na camada do IPPUC,
+pelo nome completo como está no OpenStreetMap — o tipo da via na frente
+("Rua", "Avenida", "Alameda"...) e os números por extenso quando o nome
+oficial é assim ("Sete de Setembro"). O resto é tolerado:
 
-Uma rua inteira tem ~900 a 1.300 vistas candidatas; com a segmentação na CPU,
-conte perto de uma hora.
+| Digitado | Encontra |
+|---|---|
+| `rua comendador araujo` | Rua Comendador Araújo (acento e maiúsculas não importam) |
+| `R. Des. Motta` | Rua Desembargador Motta (abreviações) |
+| `R. Teodomiro Furtado, Xaxim, Curitiba` | Rua Teodomiro Furtado (o que vem depois da vírgula é ignorado) |
+
+- Abreviações do tipo da via valem na primeira palavra, com ou sem ponto
+  (`R.`, `Av`, `Al.`, `Tv.`, `Pça.`, `Rod.`, `Lgo.`); as de título, só com
+  ponto (`Dr.`, `Des.`, `Prof.`, `Cel.`, `Gen.`, `Com.`, `Eng.`, `Sen.`,
+  `Pe.`, `Sta.`...).
+- Sem o nome exato, a busca tenta "contém": se casar com várias ruas, o menu
+  lista as candidatas para escolher (até 15; acima disso, pede mais do nome).
+  Se nada casar, sugere os nomes parecidos — um erro de digitação
+  ("Comendadr Araujo") ainda chega à rua.
+- O OSM às vezes grafa a mesma rua de dois jeitos em trechos diferentes
+  ("Isaias" e "Isaías"): nomes que só diferem em acento ou maiúscula contam
+  como uma rua só.
+- Se a rua existe no OSM mas não tem calçadas na camada do IPPUC, o menu
+  avisa e pergunta de novo.
+
+**A quantidade** vale para as zonas **ainda sem resultado**, escolhidas
+espalhadas pela rua, e limita tudo — inclusive a consulta aos panoramas.
+Enter roda todas as que faltam. Pode ser interrompido (Ctrl+C) e rodado de
+novo: continua de onde parou.
+
+Sem perguntas: `python -m scripts.ingestao.coleta_streetview rua --nome "rua comendador araujo" --limite 20`.
+
+Cada zona tem ~4 vistas candidatas. Com a segmentação na CPU, uma rua de ~50
+zonas leva uns 20 minutos; uma avenida longa (~250 zonas, ~1.000 vistas),
+perto de uma hora e meia.
 
 ### Etapa por etapa
 
@@ -89,6 +121,7 @@ python -m scripts.ingestao.coleta_streetview segmentar --rua "Avenida Sete de Se
 python -m scripts.ingestao.coleta_streetview reavaliar --max-obstrucao 0.08
 ```
 
+- `--rua` aceita o nome do mesmo jeito que o menu.
 - `coletar --bbox lon_min,lat_min,lon_max,lat_max` coleta uma área em vez de
   uma rua (as zonas de uma área sem rua não vão para `downloads-ruas/`).
 - `baixar` e `segmentar` aceitam `--zonas 12,15` para zonas específicas; sem
@@ -136,6 +169,32 @@ mesma data, a com mais quadrados limpos. Só os quadrados limpos da vista
 escolhida vão para `downloads-ruas/<rua>/`. Zona sem nenhuma vista aprovada
 fica sem foto (`recoleta`).
 
+## Calibração do filtro
+
+O filtro descarta quadrados por engano (o Cityscapes não reconhece
+petit-pavé nem paver largo como calçada) e descarta também calçadas com
+problema (carro estacionado em cima, calçada inexistente) — justamente o que
+a avaliação deveria ver. Para medir isso, a Rua Teodomiro Furtado (Xaxim,
+bairro periférico, 47 zonas, 627 quadrados) foi coletada inteira como rua de
+validação:
+
+```powershell
+python -m scripts.ingestao.coleta_streetview rotular  --rua "Rua Teodomiro Furtado" --autor pedro
+python -m scripts.ingestao.coleta_streetview calibrar --rua "Rua Teodomiro Furtado"
+```
+
+- `rotular` abre uma janela com cada quadrado e a vista de contexto (o
+  quadrado em amarelo), sem mostrar o que o filtro decidiu. Teclas: `1`
+  calçada ok, `2` obstruída, `3` invadida, `4` ausente, `5` não é calçada,
+  `s` pula, `z` desfaz, `q` sai. Os rótulos ficam na tabela `rotulos`; dá para
+  parar e continuar.
+- `calibrar` testa uma grade de `--min-calcada` × `--max-obstrucao` contra o
+  gabarito, usando as medidas já gravadas. Escolhe o limite em ~70% das zonas
+  e mede o erro nos outros ~30%, que é o número a relatar. Mostra quantos
+  `invadida`/`ausente` o filtro descarta e lista as calçadas boas que nenhum
+  limite recupera (piso < 5%: o modelo não as reconhece).
+- Para aplicar o limite escolhido: `reavaliar --min-calcada X --max-obstrucao Y`.
+
 ## Resultado
 
 `downloads-ruas/<rua>/` tem sempre a **coleta mais recente** da rua — é
@@ -159,11 +218,12 @@ sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 
 | Módulo | Responsabilidade |
 |---|---|
-| [config.py](config.py) | Constantes e caminhos (ruas do menu, tamanho das zonas, limites do filtro...) |
-| [geometria.py](geometria.py) | Camada de calçadas (GeoPackage, lat/lon ↔ UTM, linha central) e traçado das ruas (OpenStreetMap, com cache) |
+| [config.py](config.py) | Constantes e caminhos (tamanho das zonas, limites do filtro...) |
+| [geometria.py](geometria.py) | Camada de calçadas (GeoPackage, lat/lon ↔ UTM, linha central) e ruas do OpenStreetMap: todas as vias de Curitiba baixadas de uma vez, busca do nome digitado (acentos, abreviações, parecidos) e traçado de cada rua |
 | [streetview.py](streetview.py) | Panoramas do Google e recorte de vistas em perspectiva a partir dos tiles |
 | [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `downloads-ruas/<rua>/` e o `indice.csv` |
 | [etapas.py](etapas.py) | As etapas: 1. `coletar` (zonas e vistas candidatas), 2. `baixar` (closes, quadrados, vistas de contexto), 3. `segmentar` (piso e obstrução de cada quadrado) e `reavaliar` |
+| [calibracao.py](calibracao.py) | Gabarito humano dos quadrados (`rotular`) e varredura dos limites do filtro contra ele (`calibrar`) |
 | [cli.py](cli.py) | Menu interativo e subcomandos |
 
 Cada módulo abre com uma docstring que explica o que faz e como.
@@ -176,6 +236,7 @@ Cada módulo abre com uma docstring que explica o que faz e como.
 | `tentativas` | As vistas candidatas de cada zona: panorama, data, alvo, câmera, arquivos baixados e o que a segmentação mediu em cada quadrado. |
 | `pontos_rua` | A que rua do OSM cada zona pertence (uma zona de esquina pode estar em duas). |
 | `parametros` | O tamanho das zonas. |
+| `rotulos` | O gabarito humano de cada quadrado (`rotular`), usado por `calibrar`. |
 
 A etapa de avaliação pode recusar a vista escolhida de uma zona com
 `scripts.ingestao.coleta_streetview.banco.registrar_rejeicao(conn, zona, motivo)`: a zona passa para
@@ -196,6 +257,14 @@ amarelo, descartados em vermelho).
   levam a bloqueio temporário do IP (o código tenta de novo e, persistindo,
   para — basta rodar mais tarde). O uso dessas imagens está sujeito aos termos
   do Google Maps Platform.
+- **Nomes das ruas.** A busca casa com o nome do OpenStreetMap; um número
+  escrito diferente ("7" × "Sete") não casa. Rua aberta ou renomeada depois do
+  download das vias só aparece apagando o `_vias_curitiba.json.gz` — e o
+  Overpass, de onde ele vem, vive sobrecarregado: o download pode falhar
+  (tente de novo mais tarde).
+- **O filtro esconde problemas.** Calçada invadida por carros ou inexistente
+  sai como "pouca calçada" e não vai para `downloads-ruas/`; veja a
+  [calibração](#calibração-do-filtro).
 - **Obstruções que o modelo não conhece.** O Cityscapes não tem classes para
   lixo, cones ou entulho: um saco de lixo na calçada não reprova o quadrado.
 - **Segmentação aproximada.** O modelo vê a vista de contexto em 512×512 e
