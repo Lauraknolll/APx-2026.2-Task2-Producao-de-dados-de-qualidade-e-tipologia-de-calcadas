@@ -134,7 +134,7 @@ _MIGRACOES = {
 
 def abrir_db(path: Path = DB_PATH) -> sqlite3.Connection:
     """Abre (e cria ou atualiza, se preciso) o banco do pipeline."""
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, timeout=30.0, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(ESQUEMA)
     for tabela, colunas in _MIGRACOES.items():

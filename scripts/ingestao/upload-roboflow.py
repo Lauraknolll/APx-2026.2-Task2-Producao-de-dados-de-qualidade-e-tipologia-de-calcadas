@@ -2,8 +2,10 @@ import argparse
 import csv
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -312,24 +314,33 @@ def main():
             if sucesso:
                 sucessos += 1
                 agora = datetime.now(timezone.utc).isoformat()
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO uploads_roboflow
-                        (rua_slug, arquivo, arquivo_remoto, ponto_id, tentativa, quadrado, batch_name, enviado_em)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        item["rua_slug"],
-                        item["arquivo"],
-                        item["arquivo_remoto"],
-                        item["zona"],
-                        item["tentativa"],
-                        item["quadrado"],
-                        item["batch_name"],
-                        agora,
-                    ),
-                )
-                conn.commit()
+                gravou = False
+                for tent in range(5):
+                    try:
+                        conn.execute(
+                            """
+                            INSERT OR REPLACE INTO uploads_roboflow
+                                (rua_slug, arquivo, arquivo_remoto, ponto_id, tentativa, quadrado, batch_name, enviado_em)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                item["rua_slug"],
+                                item["arquivo"],
+                                item["arquivo_remoto"],
+                                item["zona"],
+                                item["tentativa"],
+                                item["quadrado"],
+                                item["batch_name"],
+                                agora,
+                            ),
+                        )
+                        conn.commit()
+                        gravou = True
+                        break
+                    except sqlite3.OperationalError:
+                        time.sleep(0.5 * (tent + 1))
+                if not gravou:
+                    print(f"  [AVISO] Não foi possível salvar registro no banco para: {item['arquivo_remoto']}")
                 print(f"[{sucessos + falhas}/{total}] Upload OK: {msg}")
             else:
                 falhas += 1
