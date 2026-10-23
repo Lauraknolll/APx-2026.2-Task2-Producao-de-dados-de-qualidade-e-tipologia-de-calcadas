@@ -100,13 +100,15 @@ ESQUEMA = """
     );
 
     CREATE TABLE IF NOT EXISTS uploads_roboflow (
-        arquivo     TEXT PRIMARY KEY,             -- ex: "1_4_1.jpg"
-        ponto_id    INTEGER NOT NULL,
-        tentativa   INTEGER NOT NULL,
-        quadrado    INTEGER NOT NULL,
-        rua_slug    TEXT NOT NULL,
-        batch_name  TEXT NOT NULL,
-        enviado_em  TEXT NOT NULL                 -- ISO timestamp
+        rua_slug        TEXT NOT NULL,
+        arquivo         TEXT NOT NULL,             -- ex: "1_4_1.jpg"
+        arquivo_remoto  TEXT NOT NULL,             -- ex: "avenida-sete-de-setembro__1_4_1.jpg"
+        ponto_id        INTEGER NOT NULL,
+        tentativa       INTEGER NOT NULL,
+        quadrado        INTEGER NOT NULL,
+        batch_name      TEXT NOT NULL,
+        enviado_em      TEXT NOT NULL,             -- ISO timestamp
+        PRIMARY KEY (rua_slug, arquivo)
     );
 """
 
@@ -128,6 +130,26 @@ def abrir_db(path: Path = DB_PATH) -> sqlite3.Connection:
         for coluna, tipo in colunas:
             if coluna not in existentes:
                 conn.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
+
+    # Migração / reciclagem da tabela uploads_roboflow para suporte a múltiplas ruas e nome remoto
+    colunas_uploads = {c[1] for c in conn.execute("PRAGMA table_info(uploads_roboflow)")}
+    if colunas_uploads and "arquivo_remoto" not in colunas_uploads:
+        conn.execute("DROP TABLE uploads_roboflow")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS uploads_roboflow (
+                rua_slug        TEXT NOT NULL,
+                arquivo         TEXT NOT NULL,
+                arquivo_remoto  TEXT NOT NULL,
+                ponto_id        INTEGER NOT NULL,
+                tentativa       INTEGER NOT NULL,
+                quadrado        INTEGER NOT NULL,
+                batch_name      TEXT NOT NULL,
+                enviado_em      TEXT NOT NULL,
+                PRIMARY KEY (rua_slug, arquivo)
+            )
+            """
+        )
     return conn
 
 
