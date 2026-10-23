@@ -21,3 +21,9 @@ data/raw/apx2*/
 data/processed/apx2*/
 
 .ipynb_checkpoints/
+
+# Coleta Street View: dados gerados
+data/processed/passeio.gpkg
+data/processed/streetview.db
+data/processed/streetview/
+downloads-ruas/
