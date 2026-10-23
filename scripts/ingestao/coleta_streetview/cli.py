@@ -7,7 +7,7 @@ etapas continuam disponíveis como subcomandos, para rodar uma de cada vez:
 
     coletar    zonas e vistas candidatas (só metadados)
     baixar     closes, quadrados e vistas de contexto
-    segmentar  quadrados limpos, escolha da vista de cada zona, downloads-ruas/
+    segmentar  quadrados limpos, escolha da vista de cada zona, data/processed/downloads-ruas/
     reavaliar  refaz a escolha com outros limites, sem baixar nem segmentar
     rotular    gabarito humano dos quadrados, para calibrar o filtro
     calibrar   varre os limites do filtro contra o gabarito
@@ -102,7 +102,7 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
     """
     Uma rua do começo ao fim: coleta, closes e quadrados, segmentação e
     escolha da melhor vista de cada zona, capturas históricas onde nenhuma
-    recente serviu e, por fim, downloads-ruas/<rua>/. Com um limite, roda só
+    recente serviu e, por fim, data/processed/downloads-ruas/<rua>/. Com um limite, roda só
     N zonas ainda sem resultado, espalhadas pela rua — da coleta em diante.
     Pode ser interrompido e rodado de novo: continua de onde parou.
     """

@@ -25,7 +25,7 @@ As etapas do pipeline, na ordem: `coletar`, `baixar`, `segmentar` (e
                retângulo do close dentro do contexto) mede o piso (calçada ou
                terreno) e a obstrução, incluindo o borrão que o Google põe
                sobre o próprio carro (detectado por não ter textura). Depois
-               escolhe a vista de cada zona e atualiza downloads-ruas/.
+               escolhe a vista de cada zona e atualiza data/processed/downloads-ruas/.
 """
 
 import json
@@ -374,6 +374,7 @@ def cmd_segmentar(args, conn: sqlite3.Connection):
     import torch
     from PIL import Image, ImageDraw
     from transformers import SegformerForSemanticSegmentation, SegformerImageProcessor
+    from ...utils.device import get_device
 
     filtro, params = filtro_zonas(args)
     linhas = conn.execute(f"""
@@ -385,7 +386,7 @@ def cmd_segmentar(args, conn: sqlite3.Connection):
         print("Nenhuma vista baixada esperando segmentação" + dica(args, " — rode 'baixar' antes") + ".")
         return
 
-    dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
+    dispositivo = get_device()
     print(f"Segmentando {len(linhas)} vistas ({dispositivo})...")
     proc = SegformerImageProcessor.from_pretrained(MODELO_SEGMENTACAO)
     modelo = SegformerForSemanticSegmentation.from_pretrained(MODELO_SEGMENTACAO).to(dispositivo).eval()

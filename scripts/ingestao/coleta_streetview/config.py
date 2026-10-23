@@ -19,8 +19,8 @@ CALCADAS_ZIP = RAIZ / "data" / "raw" / "_Passeio_CWB.zip"
 CALCADAS_PATH = RAIZ / "data" / "processed" / "passeio.gpkg"
 CACHE_RUAS = RAIZ / "data" / "raw" / "ruas_osm"            # traçados de ruas do OSM, já consultados
 DB_PATH = RAIZ / "data" / "processed" / "streetview.db"    # estado do pipeline
-PASTA_IMAGENS = RAIZ / "data" / "processed" / "streetview"  # arquivos de trabalho (todas as vistas)
-PASTA_RUAS = RAIZ / "downloads-ruas"                        # resultado: downloads-ruas/<rua>/
+PASTA_IMAGENS = RAIZ / "data" / "processed" / "streetview"       # arquivos de trabalho (todas as vistas)
+PASTA_RUAS = RAIZ / "data" / "processed" / "downloads-ruas"      # resultado: data/processed/downloads-ruas/<rua>/
 
 # --------------------------------------------------------------------------- #
 # Ruas e zonas

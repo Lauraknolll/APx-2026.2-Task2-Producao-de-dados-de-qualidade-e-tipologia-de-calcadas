@@ -9,7 +9,7 @@ Para cada rua, o pipeline divide as calçadas da camada do IPPUC em **zonas de
 **close da calçada** (da guia ao alinhamento dos prédios), corta o close em
 **3 quadrados** e guarda só os quadrados em que uma IA de segmentação confirma
 **calçada sem obstrução**. O resultado de cada rua fica em
-`downloads-ruas/<rua>/`, com um `indice.csv` que liga cada foto às
+`data/processed/downloads-ruas/<rua>/`, com um `indice.csv` que liga cada foto às
 coordenadas e ao panorama de origem. É a etapa de coleta: a avaliação da
 qualidade da calçada (tipologia e defeitos) vem depois e usa essas imagens.
 
@@ -30,9 +30,10 @@ no ambiente Docker dos notebooks.
 - A [streetlevel](https://github.com/sk-zk/streetlevel) vai com `--no-deps`
   porque uma dependência dela (`pyfrpc`, só usada para o Mapy.cz) não compila
   no Python 3.14; as outras estão no `requirements.txt`.
-- O `torch` instalado assim roda na CPU. Para a segmentação usar a GPU,
-  instale o build com CUDA (<https://pytorch.org/get-started/locally/>) — o
-  código usa a GPU sozinho quando ela está disponível.
+- O `torch` instalado assim roda na CPU. Para a segmentação usar a GPU:
+  - **NVIDIA (CUDA):** instale o build com CUDA (<https://pytorch.org/get-started/locally/>).
+  - **AMD/Intel no Windows (DirectML):** instale `pip install torch-directml "transformers<5.0"`.
+  O código detecta e usa a GPU sozinho (`cuda` ou `directml`) quando disponível.
 - Na primeira segmentação, o modelo (~210 MB) é baixado do Hugging Face e
   fica em cache.
 
@@ -123,7 +124,7 @@ python -m scripts.ingestao.coleta_streetview reavaliar --max-obstrucao 0.08
 
 - `--rua` aceita o nome do mesmo jeito que o menu.
 - `coletar --bbox lon_min,lat_min,lon_max,lat_max` coleta uma área em vez de
-  uma rua (as zonas de uma área sem rua não vão para `downloads-ruas/`).
+  uma rua (as zonas de uma área sem rua não vão para `data/processed/downloads-ruas/`).
 - `baixar` e `segmentar` aceitam `--zonas 12,15` para zonas específicas; sem
   `--rua` nem `--zonas`, trabalham sobre todas as zonas pendentes do banco.
 - `reavaliar` refaz a escolha com outros limites usando só o que já está no
@@ -166,7 +167,7 @@ e muros são medidos, mas não reprovam: quase sempre ficam ao lado ou atrás da
 calçada. Entre as vistas com algum quadrado limpo, a zona fica com a de
 **captura mais recente** (o que se avalia é a calçada como está hoje); na
 mesma data, a com mais quadrados limpos. Só os quadrados limpos da vista
-escolhida vão para `downloads-ruas/<rua>/`. Zona sem nenhuma vista aprovada
+escolhida vão para `data/processed/downloads-ruas/<rua>/`. Zona sem nenhuma vista aprovada
 fica sem foto (`recoleta`).
 
 ## Calibração do filtro
@@ -197,7 +198,7 @@ python -m scripts.ingestao.coleta_streetview calibrar --rua "Rua Teodomiro Furta
 
 ## Resultado
 
-`downloads-ruas/<rua>/` tem sempre a **coleta mais recente** da rua — é
+`data/processed/downloads-ruas/<rua>/` tem sempre a **coleta mais recente** da rua — é
 sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 
 - `<zona>_<tentativa>_<quadrado>.jpg` — os quadrados de calçada limpos
@@ -221,7 +222,7 @@ sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 | [config.py](config.py) | Constantes e caminhos (tamanho das zonas, limites do filtro...) |
 | [geometria.py](geometria.py) | Camada de calçadas (GeoPackage, lat/lon ↔ UTM, linha central) e ruas do OpenStreetMap: todas as vias de Curitiba baixadas de uma vez, busca do nome digitado (acentos, abreviações, parecidos) e traçado de cada rua |
 | [streetview.py](streetview.py) | Panoramas do Google e recorte de vistas em perspectiva a partir dos tiles |
-| [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `downloads-ruas/<rua>/` e o `indice.csv` |
+| [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `data/processed/downloads-ruas/<rua>/` e o `indice.csv` |
 | [etapas.py](etapas.py) | As etapas: 1. `coletar` (zonas e vistas candidatas), 2. `baixar` (closes, quadrados, vistas de contexto), 3. `segmentar` (piso e obstrução de cada quadrado) e `reavaliar` |
 | [calibracao.py](calibracao.py) | Gabarito humano dos quadrados (`rotular`) e varredura dos limites do filtro contra ele (`calibrar`) |
 | [cli.py](cli.py) | Menu interativo e subcomandos |
@@ -263,7 +264,7 @@ amarelo, descartados em vermelho).
   Overpass, de onde ele vem, vive sobrecarregado: o download pode falhar
   (tente de novo mais tarde).
 - **O filtro esconde problemas.** Calçada invadida por carros ou inexistente
-  sai como "pouca calçada" e não vai para `downloads-ruas/`; veja a
+  sai como "pouca calçada" e não vai para `data/processed/downloads-ruas/`; veja a
   [calibração](#calibração-do-filtro).
 - **Obstruções que o modelo não conhece.** O Cityscapes não tem classes para
   lixo, cones ou entulho: um saco de lixo na calçada não reprova o quadrado.
