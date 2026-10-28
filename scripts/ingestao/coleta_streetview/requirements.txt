@@ -1,0 +1,26 @@
+# Instalação (ver README):
+#   pip install -r requirements.txt
+#   pip install --no-deps streetlevel
+
+requests>=2.31
+numpy
+pillow
+scipy
+
+# Dependências da streetlevel (acesso ao Street View). A streetlevel é instalada
+# à parte, com --no-deps, porque uma dependência dela (pyfrpc, só usada para o
+# Mapy.cz) não compila no Python 3.14.
+aiohttp
+protobuf
+pyproj
+bd09convertor
+coordinatesconverter
+pyexiv2
+pycryptodome
+
+# Segmentação (SegFormer). Para usar a GPU:
+# - NVIDIA (CUDA): https://pytorch.org/get-started/locally/
+# - AMD/Intel no Windows (DirectML, Python <= 3.12): pip install torch-directml "transformers<5.0"
+torch
+torchvision
+transformers

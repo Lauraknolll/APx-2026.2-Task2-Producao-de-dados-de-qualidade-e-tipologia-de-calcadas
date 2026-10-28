@@ -20,4 +20,11 @@ sidewalk-tagger-ai/
 data/raw/apx2*/
 data/processed/apx2*/
 
+# Coleta Street View: dados gerados (camada extraída do zip, banco e rascunhos)
+data/processed/passeio.gpkg
+data/processed/streetview.db*
+data/processed/streetview/
+data/processed/downloads-ruas/
+downloads-ruas/
+
 .ipynb_checkpoints/
