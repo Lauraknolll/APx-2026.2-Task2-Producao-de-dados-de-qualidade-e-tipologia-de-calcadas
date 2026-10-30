@@ -23,7 +23,13 @@ data/processed/apx2*/
 # Coleta Street View: dados gerados (camada extraída do zip, banco e rascunhos)
 data/processed/passeio.gpkg
 data/processed/streetview.db
+data/processed/streetview.db-*
 data/processed/streetview/
 downloads-ruas/
 
 .ipynb_checkpoints/
+
+# Interface: os logs das coletas e o .exe (scripts/interface/exe/)
+data/processed/coletas/
+/build/
+/dist/

@@ -5,14 +5,29 @@ Os valores padrão da linha de comando vêm daqui; mudar um número aqui muda o
 comportamento de todas as etapas que o usam.
 """
 
+import sys
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #
 # Caminhos
 # --------------------------------------------------------------------------- #
 
-# Raiz do repositório (este arquivo está em scripts/ingestao/coleta_streetview/).
-RAIZ = Path(__file__).resolve().parents[3]
+
+def _raiz() -> Path:
+    """
+    Raiz do repositório (este arquivo está em scripts/ingestao/coleta_streetview/).
+    No .exe da interface (PyInstaller, scripts/interface/exe/), é a primeira
+    pasta, do .exe para cima, que tem a camada de calçadas
+    (data/raw/_Passeio_CWB.zip): o .exe gerado em dist/ usa os dados do
+    repositório; copiado para outro lugar, a própria pasta dele.
+    """
+    if not getattr(sys, "frozen", False):
+        return Path(__file__).resolve().parents[3]
+    exe = Path(sys.executable).resolve().parent
+    return next((p for p in (exe, *exe.parents) if (p / "data" / "raw" / "_Passeio_CWB.zip").is_file()), exe)
+
+
+RAIZ = _raiz()
 # Camada de calçadas do IPPUC: versionada zipada em data/raw/; extraída
 # automaticamente para data/processed/ no primeiro uso (geometria.garantir_calcadas).
 CALCADAS_ZIP = RAIZ / "data" / "raw" / "_Passeio_CWB.zip"
