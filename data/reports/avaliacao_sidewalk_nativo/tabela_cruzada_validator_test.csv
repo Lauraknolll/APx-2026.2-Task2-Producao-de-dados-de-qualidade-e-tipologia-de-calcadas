@@ -1,0 +1,7 @@
+label_nome,correct,incorrect,All
+Adequada,19,18,37
+Inadequada,5,1,6
+Não identificável,4,7,11
+Parcialmente Adequado,5,4,9
+Sem calçada,11,1,12
+All,44,31,75
