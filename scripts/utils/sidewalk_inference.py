@@ -90,7 +90,7 @@ def carregar_tagger_hf(repo_id=TAGGER_REPO_ID, filename=TAGGER_FILENAME, device=
 def executar_ou_carregar_predicoes(
     raw_dir="data/raw/apx2-bzsou-v3",
     splits=("test", "valid", "train"),
-    output_dir="data/raw/apx2-bzsou-v3/predicoes_sidewalk",
+    output_dir="data/reports/avaliacao_sidewalk_nativo",
     forcar_recalculo=False,
     device=None,
 ):
@@ -422,16 +422,17 @@ def criar_tagger_sem_brick(repo_id=TAGGER_REPO_ID, filename=TAGGER_FILENAME, dev
 
 def _carregar_ou_extrair_embeddings_tagger(
     raw_dir="data/raw/apx2-bzsou-v3",
-    output_dir="data/raw/apx2-bzsou-v3/predicoes_sidewalk",
+    processed_dir="data/processed/apx2-bzsou-v3",
     device=None,
 ):
     """
     Carrega do cache (ou extrai do backbone DINOv2-Base do Tagger caso não exista)
     os embeddings de 768 dimensões e os scores das 12 tags originais para train, valid e test.
+    Salva o arquivo compactado em processed_dir (ignorado no git).
     """
-    out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-    npz_file = out_path / "features_hibridas_v3.npz"
+    proc_path = Path(processed_dir)
+    proc_path.mkdir(parents=True, exist_ok=True)
+    npz_file = proc_path / "features_hibridas_v3.npz"
 
     if npz_file.exists():
         return dict(np.load(npz_file, allow_pickle=True))
@@ -498,7 +499,8 @@ def _carregar_ou_extrair_embeddings_tagger(
 
 def finetunar_tagger_curitiba(
     raw_dir="data/raw/apx2-bzsou-v3",
-    output_dir="data/raw/apx2-bzsou-v3/predicoes_sidewalk",
+    output_dir="data/reports/avaliacao_sidewalk_nativo",
+    processed_dir="data/processed/apx2-bzsou-v3",
     epochs=35,
     lr=1.5e-3,
     forcar_retreino=False,
@@ -511,19 +513,22 @@ def finetunar_tagger_curitiba(
       - Calçadas com defeito ('Inadequada', 'Parcialmente Adequado', 'Sem calçada'): Target baseado nas
         ativações do modelo original (Teacher) para preservar a capacidade de diagnosticar os 11 defeitos.
       - 'Não identificável' (id=2): Ignorada no treinamento para não introduzir ruído visual.
-    Salva o checkpoint ajustado e retorna o DataFrame com as novas predições vinculadas às imagens originais.
+    Salva o checkpoint ajustado em processed_dir e as predições tabulares em output_dir.
     """
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
+    proc_path = Path(processed_dir)
+    proc_path.mkdir(parents=True, exist_ok=True)
+
     csv_file = out_path / "predicoes_tagger_finetuned_v3.csv"
     json_file = out_path / "predicoes_tagger_finetuned_v3.json"
-    pth_out = out_path / "tagger_curitiba_sem_brick.pth"
+    pth_out = proc_path / "tagger_curitiba_sem_brick.pth"
 
     if csv_file.exists() and pth_out.exists() and not forcar_retreino:
         print(f"Carregando predições do Tagger Fine-Tunado (sem 'brick/cobblestone') de '{csv_file}'...")
         return pd.read_csv(csv_file)
 
-    dados = _carregar_ou_extrair_embeddings_tagger(raw_dir=raw_dir, output_dir=output_dir, device=device)
+    dados = _carregar_ou_extrair_embeddings_tagger(raw_dir=raw_dir, processed_dir=processed_dir, device=device)
     X_train_emb = dados["X_train_emb"]
     X_train_tags = dados["X_train_tags"]
     y_train = dados["y_train"]
