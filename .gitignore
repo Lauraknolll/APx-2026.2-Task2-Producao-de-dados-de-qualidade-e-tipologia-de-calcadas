@@ -11,9 +11,12 @@ __pycache__/
 .vscode/
 
 # Modelos e arquivos pesados (>50MB)
-models/
+data/models/**/*.pth
+data/models/**/*.pt
+data/models/**/*.joblib
 *.pth
 *.pt
+*.joblib
 *.zip
 .agents/
 

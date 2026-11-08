@@ -530,6 +530,7 @@ def finetunar_tagger_curitiba(
     raw_dir="data/raw/apx2-bzsou-v3",
     output_dir="data/reports/avaliacao_sidewalk_nativo",
     processed_dir="data/processed/apx2-bzsou-v3",
+    models_dir="data/models",
     epochs=35,
     lr=1.5e-3,
     forcar_retreino=False,
@@ -543,20 +544,28 @@ def finetunar_tagger_curitiba(
       - Calçadas com defeito ('Inadequada', 'Parcialmente Adequado', 'Sem calçada'): Target baseado nas
         ativações do modelo original (Teacher) para preservar a capacidade de diagnosticar os 11 defeitos.
       - 'Não identificável' (id=4): Ignorada no treinamento para não introduzir ruído visual.
-    Salva o checkpoint ajustado em processed_dir e data/processed, e as predições tabulares em output_dir.
+    Salva o checkpoint ajustado em models_dir ('data/models'), e as predições tabulares em output_dir.
     """
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     proc_path = Path(processed_dir)
     proc_path.mkdir(parents=True, exist_ok=True)
+    models_path = Path(models_dir)
+    models_path.mkdir(parents=True, exist_ok=True)
 
     version = "v4" if "v4" in str(raw_dir) or "v4" in str(processed_dir) else "v3"
     csv_file = out_path / f"predicoes_tagger_finetuned_{version}.csv"
     json_file = out_path / f"predicoes_tagger_finetuned_{version}.json"
-    pth_root = Path("data/processed") / checkpoint_name
+    pth_models = models_path / checkpoint_name
+    pth_versioned = models_path / f"tagger_curitiba_sem_brick_{version}.pth"
     pth_proc = proc_path / checkpoint_name
+    pth_root = Path("data/processed") / checkpoint_name
 
-    if csv_file.exists() and (pth_proc.exists() or pth_root.exists()) and not forcar_retreino:
+    if (
+        csv_file.exists()
+        and (pth_models.exists() or pth_versioned.exists() or pth_proc.exists() or pth_root.exists())
+        and not forcar_retreino
+    ):
         print(f"Carregando predições do Tagger Fine-Tunado (sem 'brick/cobblestone') de '{csv_file}'...")
         return pd.read_csv(csv_file)
 
@@ -645,10 +654,9 @@ def finetunar_tagger_curitiba(
         "tags": TAGS_SEM_BRICK,
         "indices_originais": INDICES_SEM_BRICK,
     }
-    pth_root.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(ckpt_dict, pth_root)
-    if pth_proc.resolve() != pth_root.resolve():
-        torch.save(ckpt_dict, pth_proc)
+    pth_models.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(ckpt_dict, pth_models)
+    torch.save(ckpt_dict, pth_versioned)
 
     # Gera predições em todos os splits mantendo vínculo com as imagens originais
     df_imagens = listar_imagens_coco(raw_dir=raw_dir, splits=("test", "valid", "train"))
@@ -701,7 +709,7 @@ def finetunar_tagger_curitiba(
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(df_ft.to_dict(orient="records"), f, indent=2, ensure_ascii=False)
 
-    print(f"Checkpoint e predições do Tagger Fine-Tunado salvos em:\n -> {pth_root}\n -> {pth_proc}\n -> {csv_file}")
+    print(f"Checkpoint e predições do Tagger Fine-Tunado salvos em:\n -> {pth_models}\n -> {pth_versioned}\n -> {csv_file}")
     return df_ft
 
 
