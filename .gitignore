@@ -11,9 +11,11 @@ __pycache__/
 .vscode/
 
 # Modelos e arquivos pesados (>50MB)
-data/models/*.pth
-data/models/*.pt
+models/
+*.pth
+*.pt
 *.zip
+.agents/
 
 # Repositório clonado para referência local
 sidewalk-tagger-ai/

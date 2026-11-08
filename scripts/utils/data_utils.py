@@ -42,12 +42,17 @@ TAXONOMIAS = {
 }
 
 
-def carregar_dados(data_dir="data/processed/apx2-bzsou-v3", raw_dir="data/raw/apx2-bzsou-v3"):
+def carregar_dados(data_dir="data/processed/apx2-bzsou-v3", raw_dir=None, processed_dir=None):
     """
     Carrega os vetores de features e rótulos de treino, validação e teste (.npy),
     além da lista ordenada de caminhos absolutos/relativos das imagens de teste
     conforme anotadas no arquivo COCO.
     """
+    if processed_dir is not None:
+        data_dir = processed_dir
+    if raw_dir is None:
+        raw_dir = str(data_dir).replace("processed", "raw")
+
     X_train = np.load(os.path.join(data_dir, "train_features.npy"))
     y_train = np.load(os.path.join(data_dir, "train_labels.npy"))
     X_valid = np.load(os.path.join(data_dir, "valid_features.npy"))
@@ -68,6 +73,10 @@ def carregar_dados(data_dir="data/processed/apx2-bzsou-v3", raw_dir="data/raw/ap
     for img_info in coco_test["images"]:
         if img_to_cats.get(img_info["id"]):
             test_paths.append(os.path.join(raw_dir, "test", img_info["file_name"]))
+
+    assert len(test_paths) == len(X_test), (
+        f"Descasamento entre test_paths ({len(test_paths)}) e X_test ({len(X_test)})"
+    )
 
     return {
         "X_train": X_train,

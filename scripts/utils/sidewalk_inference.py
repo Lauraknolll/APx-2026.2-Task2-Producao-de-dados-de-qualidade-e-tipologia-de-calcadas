@@ -100,8 +100,9 @@ def executar_ou_carregar_predicoes(
     Os resultados são salvos em CSV e JSON com link completo para as imagens originais.
     """
     out_path = Path(output_dir)
-    csv_file = out_path / "predicoes_sidewalk_v3.csv"
-    json_file = out_path / "predicoes_sidewalk_v3.json"
+    version = "v4" if "v4" in str(raw_dir) else "v3"
+    csv_file = out_path / f"predicoes_sidewalk_{version}.csv"
+    json_file = out_path / f"predicoes_sidewalk_{version}.json"
 
     if csv_file.exists() and not forcar_recalculo:
         print(f"Carregando predições existentes de '{csv_file}'...")
@@ -292,7 +293,7 @@ def avaliar_tagger(df_pred, split="test", reports_dir="data/reports/avaliacao_si
         fig.savefig(caminho_fig, dpi=140)
         print(f"\n[Heatmap salvo em '{caminho_fig}']")
 
-    plt.show()
+    plt.close(fig)
 
 
 def plotar_10_amostras_validator(df_pred, split="test", seed=None):
@@ -354,7 +355,7 @@ def plotar_10_amostras_validator(df_pred, split="test", seed=None):
             pad=8,
         )
 
-    plt.show()
+    plt.close(fig)
 
 
 def plotar_10_amostras_tagger(df_pred, split="test", seed=None):
@@ -397,7 +398,7 @@ def plotar_10_amostras_tagger(df_pred, split="test", seed=None):
             pad=8,
         )
 
-    plt.show()
+    plt.close(fig)
 
 
 def criar_tagger_sem_brick(repo_id=TAGGER_REPO_ID, filename=TAGGER_FILENAME, device=None):
@@ -424,6 +425,7 @@ def _carregar_ou_extrair_embeddings_tagger(
     raw_dir="data/raw/apx2-bzsou-v3",
     processed_dir="data/processed/apx2-bzsou-v3",
     device=None,
+    npz_filename=None,
 ):
     """
     Carrega do cache (ou extrai do backbone DINOv2-Base do Tagger caso não exista)
@@ -432,14 +434,23 @@ def _carregar_ou_extrair_embeddings_tagger(
     """
     proc_path = Path(processed_dir)
     proc_path.mkdir(parents=True, exist_ok=True)
-    npz_file = proc_path / "features_hibridas_v3.npz"
+    if npz_filename is None:
+        tag_v = "v4" if "v4" in str(proc_path) or "v4" in str(raw_dir) else "v3"
+        npz_filename = f"features_hibridas_{tag_v}.npz"
+    npz_file = proc_path / npz_filename
 
     if npz_file.exists():
         return dict(np.load(npz_file, allow_pickle=True))
 
     if device is None:
         device = get_device()
-    _, t_model, _ = carregar_tagger_hf(device=device)
+    try:
+        _, t_model, device = carregar_tagger_hf(device=device)
+    except Exception as e:
+        print(f"Fallback para CPU ao carregar tagger: {e}")
+        device = torch.device("cpu")
+        _, t_model, device = carregar_tagger_hf(device=device)
+
     t_trans_fast = T.Compose([
         T.Resize(266),
         T.CenterCrop(266),
@@ -464,11 +475,20 @@ def _carregar_ou_extrair_embeddings_tagger(
                 continue
 
             if len(batch_tensors) == 16:
-                bt = torch.stack(batch_tensors).to(device)
-                with torch.no_grad():
-                    feat = t_model.transformer(bt)
-                    feat_norm = t_model.transformer.norm(feat)
-                    probs = torch.sigmoid(t_model.classifier(feat_norm))[:, idx_valid]
+                try:
+                    bt = torch.stack(batch_tensors).to(device)
+                    with torch.no_grad():
+                        feat = t_model.transformer(bt)
+                        feat_norm = t_model.transformer.norm(feat)
+                        probs = torch.sigmoid(t_model.classifier(feat_norm))[:, idx_valid]
+                except Exception:
+                    device = torch.device("cpu")
+                    t_model.to(device)
+                    bt = torch.stack(batch_tensors).to(device)
+                    with torch.no_grad():
+                        feat = t_model.transformer(bt)
+                        feat_norm = t_model.transformer.norm(feat)
+                        probs = torch.sigmoid(t_model.classifier(feat_norm))[:, idx_valid]
                 embs.append(feat_norm.cpu().numpy())
                 tags.append(probs.cpu().numpy())
                 for lid, pth in batch_meta:
@@ -477,11 +497,20 @@ def _carregar_ou_extrair_embeddings_tagger(
                 batch_tensors, batch_meta = [], []
 
         if batch_tensors:
-            bt = torch.stack(batch_tensors).to(device)
-            with torch.no_grad():
-                feat = t_model.transformer(bt)
-                feat_norm = t_model.transformer.norm(feat)
-                probs = torch.sigmoid(t_model.classifier(feat_norm))[:, idx_valid]
+            try:
+                bt = torch.stack(batch_tensors).to(device)
+                with torch.no_grad():
+                    feat = t_model.transformer(bt)
+                    feat_norm = t_model.transformer.norm(feat)
+                    probs = torch.sigmoid(t_model.classifier(feat_norm))[:, idx_valid]
+            except Exception:
+                device = torch.device("cpu")
+                t_model.to(device)
+                bt = torch.stack(batch_tensors).to(device)
+                with torch.no_grad():
+                    feat = t_model.transformer(bt)
+                    feat_norm = t_model.transformer.norm(feat)
+                    probs = torch.sigmoid(t_model.classifier(feat_norm))[:, idx_valid]
             embs.append(feat_norm.cpu().numpy())
             tags.append(probs.cpu().numpy())
             for lid, pth in batch_meta:
@@ -505,26 +534,29 @@ def finetunar_tagger_curitiba(
     lr=1.5e-3,
     forcar_retreino=False,
     device=None,
+    checkpoint_name="tagger_curitiba_sem_brick.pth",
 ):
     """
     Executa o fine-tuning leve da cabeça classificadora do sidewalk-tagger-ai (sem 'brick/cobblestone')
-    usando os dados de treino do dataset v3 de Curitiba com Supervisão Fraca + Pseudo-Labels:
+    usando os dados de treino de Curitiba com Supervisão Fraca + Pseudo-Labels:
       - Calçadas 'Adequada' (id=0): Target = [0, 0, ..., 0] nas 11 tags (ensina que o petit-pavé íntegro não é defeito).
       - Calçadas com defeito ('Inadequada', 'Parcialmente Adequado', 'Sem calçada'): Target baseado nas
         ativações do modelo original (Teacher) para preservar a capacidade de diagnosticar os 11 defeitos.
-      - 'Não identificável' (id=2): Ignorada no treinamento para não introduzir ruído visual.
-    Salva o checkpoint ajustado em processed_dir e as predições tabulares em output_dir.
+      - 'Não identificável' (id=4): Ignorada no treinamento para não introduzir ruído visual.
+    Salva o checkpoint ajustado em processed_dir e data/processed, e as predições tabulares em output_dir.
     """
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     proc_path = Path(processed_dir)
     proc_path.mkdir(parents=True, exist_ok=True)
 
-    csv_file = out_path / "predicoes_tagger_finetuned_v3.csv"
-    json_file = out_path / "predicoes_tagger_finetuned_v3.json"
-    pth_out = proc_path / "tagger_curitiba_sem_brick.pth"
+    version = "v4" if "v4" in str(raw_dir) or "v4" in str(processed_dir) else "v3"
+    csv_file = out_path / f"predicoes_tagger_finetuned_{version}.csv"
+    json_file = out_path / f"predicoes_tagger_finetuned_{version}.json"
+    pth_root = Path("data/processed") / checkpoint_name
+    pth_proc = proc_path / checkpoint_name
 
-    if csv_file.exists() and pth_out.exists() and not forcar_retreino:
+    if csv_file.exists() and (pth_proc.exists() or pth_root.exists()) and not forcar_retreino:
         print(f"Carregando predições do Tagger Fine-Tunado (sem 'brick/cobblestone') de '{csv_file}'...")
         return pd.read_csv(csv_file)
 
@@ -558,8 +590,8 @@ def finetunar_tagger_curitiba(
         head[2].weight.copy_(sd["classifier.2.weight"][INDICES_SEM_BRICK])
         head[2].bias.copy_(sd["classifier.2.bias"][INDICES_SEM_BRICK])
 
-    # Filtra 'Não identificável' (id=2) do split de treino
-    mask_tr = y_train != 2
+    # Filtra classe Não identificável (id=4) do split de treino
+    mask_tr = y_train != 4
     X_tr = torch.tensor(X_train_emb[mask_tr], dtype=torch.float32)
     y_tr_cls = y_train[mask_tr]
     # X_train_tags possui 12 colunas (0 = brick/cobblestone, 1..11 = TAGS_SEM_BRICK)
@@ -579,14 +611,14 @@ def finetunar_tagger_curitiba(
         if c == 0:  # Adequada -> Nenhuma tag de defeito deve disparar
             Y_target[i] = 0.0
             W_tr[i] = 1.0
-        else:  # Inadequada (1), Parcialmente Adequado (3), Sem calçada (4)
+        else:  # Parcialmente Adequado (1), Inadequada (2), Sem calçada (3)
             t = P_tr_teacher[i].copy()
             top_idx = np.argsort(t)[-3:]
             for idx_top in top_idx:
                 if t[idx_top] > 0.03:
                     t[idx_top] = min(1.0, t[idx_top] * 2.5)
-            # Preserva sensibilidade a 'very broken' (índice 10) em calçadas Inadequadas e Sem calçada
-            if c in (1, 4) and t[10] > 0.005:
+            # Preserva sensibilidade a very broken nas classes de maior degradacao
+            if c in (2, 3) and t[10] > 0.005:
                 t[10] = min(1.0, max(t[10] * 5.0, 0.55))
             if t.max() < 0.5:
                 t[np.argmax(P_tr_teacher[i])] = 0.75
@@ -608,14 +640,15 @@ def finetunar_tagger_curitiba(
         optimizer.step()
 
     head.eval()
-    torch.save(
-        {
-            "classifier_state_dict": head.state_dict(),
-            "tags": TAGS_SEM_BRICK,
-            "indices_originais": INDICES_SEM_BRICK,
-        },
-        pth_out,
-    )
+    ckpt_dict = {
+        "classifier_state_dict": head.state_dict(),
+        "tags": TAGS_SEM_BRICK,
+        "indices_originais": INDICES_SEM_BRICK,
+    }
+    pth_root.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(ckpt_dict, pth_root)
+    if pth_proc.resolve() != pth_root.resolve():
+        torch.save(ckpt_dict, pth_proc)
 
     # Gera predições em todos os splits mantendo vínculo com as imagens originais
     df_imagens = listar_imagens_coco(raw_dir=raw_dir, splits=("test", "valid", "train"))
@@ -668,8 +701,74 @@ def finetunar_tagger_curitiba(
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(df_ft.to_dict(orient="records"), f, indent=2, ensure_ascii=False)
 
-    print(f"Checkpoint e predições do Tagger Fine-Tunado salvos em:\n -> {pth_out}\n -> {csv_file}")
+    print(f"Checkpoint e predições do Tagger Fine-Tunado salvos em:\n -> {pth_root}\n -> {pth_proc}\n -> {csv_file}")
     return df_ft
+
+
+def obter_predicoes_originais_tagger(
+    raw_dir="data/raw/apx2-bzsou-v3",
+    processed_dir="data/processed/apx2-bzsou-v3",
+    output_dir="data/reports/avaliacao_sidewalk_nativo",
+    forcar_recalculo=False,
+    device=None,
+):
+    """
+    Consolida as predições do Sidewalk Tagger original (12 classes) a partir dos dados extraídos.
+    """
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    version = "v4" if "v4" in str(raw_dir) or "v4" in str(processed_dir) else "v3"
+    csv_file = out_path / f"predicoes_tagger_original_{version}.csv"
+    json_file = out_path / f"predicoes_tagger_original_{version}.json"
+
+    if csv_file.exists() and not forcar_recalculo:
+        return pd.read_csv(csv_file)
+
+    dados = _carregar_ou_extrair_embeddings_tagger(raw_dir=raw_dir, processed_dir=processed_dir, device=device)
+    df_imagens = listar_imagens_coco(raw_dir=raw_dir, splits=("test", "valid", "train"))
+
+    mapa_tags = {}
+    for split in ("test", "valid", "train"):
+        paths_s = dados[f"{split}_paths"]
+        tags_s = dados[f"X_{split}_tags"]
+        for p, t in zip(paths_s, tags_s):
+            mapa_tags[str(p)] = t
+
+    registros = []
+    for _, row in df_imagens.iterrows():
+        img_path = str(row["image_path"])
+        if img_path not in mapa_tags:
+            continue
+        probs = mapa_tags[img_path]
+        tags_validas = [(VALID_TAGS[i], float(probs[i])) for i in range(len(VALID_TAGS))]
+        tags_validas_sort = sorted(tags_validas, key=lambda x: x[1], reverse=True)
+
+        reg = {
+            "split": row["split"],
+            "image_id": row["image_id"],
+            "file_name": row["file_name"],
+            "original_name": row["original_name"],
+            "rua": row["rua"],
+            "image_path": row["image_path"],
+            "label_id": row["label_id"],
+            "label_nome": row["label_nome"],
+            "tagger_top1_name": tags_validas_sort[0][0],
+            "tagger_top1_prob": round(tags_validas_sort[0][1], 4),
+            "tagger_top2_name": tags_validas_sort[1][0],
+            "tagger_top2_prob": round(tags_validas_sort[1][1], 4),
+            "tagger_top3_name": tags_validas_sort[2][0],
+            "tagger_top3_prob": round(tags_validas_sort[2][1], 4),
+        }
+        for i, tag_name in enumerate(VALID_TAGS):
+            col_name = "tag_" + tag_name.replace("/", "_").replace(" ", "_")
+            reg[col_name] = round(float(probs[i]), 4)
+        registros.append(reg)
+
+    df_orig = pd.DataFrame(registros)
+    df_orig.to_csv(csv_file, index=False, encoding="utf-8")
+    with open(json_file, "w", encoding="utf-8") as f:
+        json.dump(df_orig.to_dict(orient="records"), f, indent=2, ensure_ascii=False)
+    return df_orig
 
 
 def comparar_tagger_antes_depois(
@@ -677,6 +776,7 @@ def comparar_tagger_antes_depois(
     df_finetuned,
     split="test",
     reports_dir="data/reports/avaliacao_sidewalk_nativo",
+    fig_suffix="",
 ):
     """
     Compara quantitativamente e visualmente (Heatmaps lado a lado) as probabilidades médias
@@ -725,7 +825,7 @@ def comparar_tagger_antes_depois(
         ax=axes[0],
     )
     axes[0].set_title("ANTES: Tagger Original (12 Tags — Com 'brick/cobblestone')", fontsize=12.5, weight="bold", pad=10)
-    axes[0].set_ylabel("Classe Real do Dataset v3", fontsize=11)
+    axes[0].set_ylabel("Classe Real", fontsize=11)
     axes[0].set_xlabel("Tag do Project Sidewalk", fontsize=11)
     axes[0].tick_params(axis="x", rotation=35)
 
@@ -752,11 +852,11 @@ def comparar_tagger_antes_depois(
     if reports_dir:
         rep_path = Path(reports_dir)
         rep_path.mkdir(parents=True, exist_ok=True)
-        fig_path = rep_path / f"tagger_comparativo_finetuning_{split}.png"
+        fig_path = rep_path / f"tagger_comparativo_finetuning_{split}{fig_suffix}.png"
         fig.savefig(fig_path, dpi=140)
         print(f"\n[Heatmap comparativo salvo em '{fig_path}']")
 
-    plt.show()
+    plt.close(fig)
 
 
 def plotar_10_amostras_tagger_finetuned(df_finetuned, split="test", seed=None):
@@ -804,7 +904,7 @@ def plotar_10_amostras_tagger_finetuned(df_finetuned, split="test", seed=None):
             pad=8,
         )
 
-    plt.show()
+    plt.close(fig)
 
 
 __all__ = [
@@ -824,6 +924,7 @@ __all__ = [
     "plotar_10_amostras_validator",
     "plotar_10_amostras_tagger",
     "finetunar_tagger_curitiba",
+    "obter_predicoes_originais_tagger",
     "comparar_tagger_antes_depois",
     "plotar_10_amostras_tagger_finetuned",
 ]
