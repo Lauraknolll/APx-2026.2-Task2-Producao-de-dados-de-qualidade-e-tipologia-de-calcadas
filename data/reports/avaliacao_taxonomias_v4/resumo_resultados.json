@@ -1,0 +1,145 @@
+{
+  "04_3classes_com_naoid": {
+    "titulo": "Cenário 4: 3 Classes com Não Identificável (Adequada | Inadequada Geral | Não id.)",
+    "descricao": "Mantém a classe de rejeição (Não id.) para uso em produção e consolida inconformidades em Inadequada Geral.",
+    "modelo": "MLP (128, alpha=0.5, early_stopping)",
+    "preproc": "l2_std",
+    "undersampling_teto": null,
+    "classes": [
+      "Adequada",
+      "Inadequada Geral",
+      "Não id."
+    ],
+    "validacao": {
+      "acc": 0.688,
+      "bal_acc": 0.5401,
+      "macro_f1": 0.5424,
+      "weighted_f1": 0.6697,
+      "f1_por_classe": {
+        "Adequada": 0.7764,
+        "Inadequada Geral": 0.6633,
+        "Não id.": 0.1875
+      }
+    },
+    "teste": {
+      "acc": 0.7565,
+      "bal_acc": 0.6467,
+      "macro_f1": 0.664,
+      "weighted_f1": 0.7477,
+      "f1_por_classe": {
+        "Adequada": 0.7966,
+        "Inadequada Geral": 0.7742,
+        "Não id.": 0.4211
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/04_3classes_com_naoid.png"
+  },
+  "05_2classes_sem_naoid": {
+    "titulo": "Cenário 5: 2 Classes Binária Crítica sem Não Identificável (Transitável vs Crítica)",
+    "descricao": "Separa calçadas transitáveis (Adequada + Parcial) de situações críticas (Inadequada + Sem calçada).",
+    "modelo": "Regressão Logística (C=0.5, balanced)",
+    "preproc": "l2_pca64",
+    "undersampling_teto": 100,
+    "classes": [
+      "Transitável",
+      "Crítica (Inad+SemCalc)"
+    ],
+    "validacao": {
+      "acc": 0.8341,
+      "bal_acc": 0.8422,
+      "macro_f1": 0.8079,
+      "weighted_f1": 0.8405,
+      "f1_por_classe": {
+        "Transitável": 0.8789,
+        "Crítica (Inad+SemCalc)": 0.7368
+      }
+    },
+    "teste": {
+      "acc": 0.8544,
+      "bal_acc": 0.8559,
+      "macro_f1": 0.8445,
+      "weighted_f1": 0.8563,
+      "f1_por_classe": {
+        "Transitável": 0.8837,
+        "Crítica (Inad+SemCalc)": 0.8052
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/05_2classes_sem_naoid.png"
+  },
+  "01_5classes_baseline": {
+    "titulo": "Cenário 1: 5 Classes Originais (Baseline MLP)",
+    "descricao": "Todas as 5 classes separadas sem pré-processamento e sem balanceamento.",
+    "modelo": "MLP (256)",
+    "preproc": "raw",
+    "undersampling_teto": null,
+    "classes": [
+      "Adequada",
+      "Parcial",
+      "Inadequada",
+      "Sem calçada",
+      "Não id."
+    ],
+    "validacao": {
+      "acc": 0.5812,
+      "bal_acc": 0.446,
+      "macro_f1": 0.4484,
+      "weighted_f1": 0.5489,
+      "f1_por_classe": {
+        "Adequada": 0.7649,
+        "Parcial": 0.274,
+        "Inadequada": 0.3846,
+        "Sem calçada": 0.5556,
+        "Não id.": 0.2632
+      }
+    },
+    "teste": {
+      "acc": 0.6261,
+      "bal_acc": 0.4845,
+      "macro_f1": 0.5006,
+      "weighted_f1": 0.607,
+      "f1_por_classe": {
+        "Adequada": 0.7863,
+        "Parcial": 0.2963,
+        "Inadequada": 0.5,
+        "Sem calçada": 0.6047,
+        "Não id.": 0.3158
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/01_5classes_baseline.png"
+  },
+  "03_3classes_sem_naoid": {
+    "titulo": "Cenário 3: 3 Classes sem Não Identificável (Adequada | Com Defeito | Sem calçada)",
+    "descricao": "Remove a classe de ruído (Não identificável) e agrupa Parcial + Inadequada como calçadas com defeito.",
+    "modelo": "Random Forest (100, balanced)",
+    "preproc": "l2_pca64",
+    "undersampling_teto": 100,
+    "classes": [
+      "Adequada",
+      "Com Defeito",
+      "Sem calçada"
+    ],
+    "validacao": {
+      "acc": 0.7393,
+      "bal_acc": 0.7753,
+      "macro_f1": 0.7805,
+      "weighted_f1": 0.7426,
+      "f1_por_classe": {
+        "Adequada": 0.75,
+        "Com Defeito": 0.6747,
+        "Sem calçada": 0.9167
+      }
+    },
+    "teste": {
+      "acc": 0.6505,
+      "bal_acc": 0.6632,
+      "macro_f1": 0.6535,
+      "weighted_f1": 0.6575,
+      "f1_por_classe": {
+        "Adequada": 0.701,
+        "Com Defeito": 0.5152,
+        "Sem calçada": 0.7442
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/03_3classes_sem_naoid.png"
+  }
+}

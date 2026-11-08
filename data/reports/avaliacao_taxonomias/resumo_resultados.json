@@ -1,0 +1,173 @@
+{
+  "01_5classes_baseline": {
+    "titulo": "Cenário 1: 5 Classes Originais (Baseline MLP)",
+    "descricao": "Todas as 5 classes separadas sem pré-processamento e sem balanceamento.",
+    "modelo": "MLP (256)",
+    "preproc": "raw",
+    "undersampling_teto": null,
+    "classes": [
+      "Adequada",
+      "Parcial",
+      "Inadequada",
+      "Sem calçada",
+      "Não id."
+    ],
+    "validacao": {
+      "acc": 0.6733,
+      "bal_acc": 0.4959,
+      "macro_f1": 0.5228,
+      "f1_por_classe": {
+        "Adequada": 0.8,
+        "Parcial": 0.3158,
+        "Inadequada": 0.6429,
+        "Sem calçada": 0.75,
+        "Não id.": 0.1053
+      }
+    },
+    "teste": {
+      "acc": 0.5867,
+      "bal_acc": 0.3829,
+      "macro_f1": 0.4021,
+      "f1_por_classe": {
+        "Adequada": 0.7765,
+        "Parcial": 0.0,
+        "Inadequada": 0.2222,
+        "Sem calçada": 0.5833,
+        "Não id.": 0.4286
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/01_5classes_baseline.png"
+  },
+  "02_4classes_com_naoid": {
+    "titulo": "Cenário 2: 4 Classes com Não Identificável (Inadequada + Sem calçada unidas)",
+    "descricao": "Une Inadequada e Sem calçada na mesma categoria crítica, mantendo Parcial e Não identificável.",
+    "modelo": "SVC RBF (C=3.0, balanced)",
+    "preproc": "l2_pca64",
+    "undersampling_teto": 70,
+    "classes": [
+      "Adequada",
+      "Parcial",
+      "Inad.+SemCalçada",
+      "Não id."
+    ],
+    "validacao": {
+      "acc": 0.6,
+      "bal_acc": 0.5423,
+      "macro_f1": 0.5244,
+      "f1_por_classe": {
+        "Adequada": 0.7338,
+        "Parcial": 0.411,
+        "Inad.+SemCalçada": 0.6452,
+        "Não id.": 0.3077
+      }
+    },
+    "teste": {
+      "acc": 0.6267,
+      "bal_acc": 0.6503,
+      "macro_f1": 0.6223,
+      "f1_por_classe": {
+        "Adequada": 0.625,
+        "Parcial": 0.3448,
+        "Inad.+SemCalçada": 0.8235,
+        "Não id.": 0.6957
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/02_4classes_com_naoid.png"
+  },
+  "03_3classes_sem_naoid": {
+    "titulo": "Cenário 3: 3 Classes sem Não Identificável (Adequada | Com Defeito | Sem calçada)",
+    "descricao": "Remove a classe de ruído (Não identificável) e agrupa Parcial + Inadequada como calçadas com defeito.",
+    "modelo": "Random Forest (100, balanced)",
+    "preproc": "l2_pca64",
+    "undersampling_teto": 100,
+    "classes": [
+      "Adequada",
+      "Com Defeito",
+      "Sem calçada"
+    ],
+    "validacao": {
+      "acc": 0.7681,
+      "bal_acc": 0.7837,
+      "macro_f1": 0.7851,
+      "f1_por_classe": {
+        "Adequada": 0.7887,
+        "Com Defeito": 0.6947,
+        "Sem calçada": 0.8718
+      }
+    },
+    "teste": {
+      "acc": 0.7188,
+      "bal_acc": 0.7231,
+      "macro_f1": 0.7117,
+      "f1_por_classe": {
+        "Adequada": 0.7879,
+        "Com Defeito": 0.5854,
+        "Sem calçada": 0.7619
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/03_3classes_sem_naoid.png"
+  },
+  "04_3classes_com_naoid": {
+    "titulo": "Cenário 4: 3 Classes com Não Identificável (Adequada | Inadequada Geral | Não id.)",
+    "descricao": "Mantém a classe de rejeição (Não id.) para uso em produção e consolida inconformidades em Inadequada Geral.",
+    "modelo": "MLP (128, alpha=0.5, early_stopping)",
+    "preproc": "l2_std",
+    "undersampling_teto": null,
+    "classes": [
+      "Adequada",
+      "Inadequada Geral",
+      "Não id."
+    ],
+    "validacao": {
+      "acc": 0.72,
+      "bal_acc": 0.5845,
+      "macro_f1": 0.5978,
+      "f1_por_classe": {
+        "Adequada": 0.8,
+        "Inadequada Geral": 0.6777,
+        "Não id.": 0.3158
+      }
+    },
+    "teste": {
+      "acc": 0.7867,
+      "bal_acc": 0.7147,
+      "macro_f1": 0.7341,
+      "f1_por_classe": {
+        "Adequada": 0.7949,
+        "Inadequada Geral": 0.8519,
+        "Não id.": 0.5556
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/04_3classes_com_naoid.png"
+  },
+  "05_2classes_sem_naoid": {
+    "titulo": "Cenário 5: 2 Classes Binária Crítica sem Não Identificável (Transitável vs Crítica)",
+    "descricao": "Separa calçadas transitáveis (Adequada + Parcial) de situações críticas (Inadequada + Sem calçada).",
+    "modelo": "Regressão Logística (C=0.5, balanced)",
+    "preproc": "l2_pca64",
+    "undersampling_teto": 100,
+    "classes": [
+      "Transitável",
+      "Crítica (Inad+SemCalc)"
+    ],
+    "validacao": {
+      "acc": 0.8768,
+      "bal_acc": 0.8675,
+      "macro_f1": 0.8535,
+      "f1_por_classe": {
+        "Transitável": 0.9119,
+        "Crítica (Inad+SemCalc)": 0.7952
+      }
+    },
+    "teste": {
+      "acc": 0.8906,
+      "bal_acc": 0.907,
+      "macro_f1": 0.8744,
+      "f1_por_classe": {
+        "Transitável": 0.9195,
+        "Crítica (Inad+SemCalc)": 0.8293
+      }
+    },
+    "matriz_confusao_arquivo": "matrizes_confusao/05_2classes_sem_naoid.png"
+  }
+}

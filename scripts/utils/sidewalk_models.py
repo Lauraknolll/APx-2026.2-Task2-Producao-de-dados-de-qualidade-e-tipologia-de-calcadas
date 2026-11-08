@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 from torch import nn
 from copy import deepcopy
@@ -6,6 +7,11 @@ import timm
 
 if not torch.cuda.is_available():
     os.environ['XFORMERS_DISABLED'] = '1'
+
+# Garante que scripts/utils esteja no sys.path para importações internas do pacote dinov2
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
 
 from dinov2.models.vision_transformer import vit_small, vit_base, vit_large, vit_giant2
 
