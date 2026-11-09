@@ -102,3 +102,20 @@ OBSTRUCAO_NA_FRENTE = ("veiculo", "pessoa", "borrao")
 # MAX_OBSTRUCAO. O piso mínimo é baixo porque o modelo subestima petit-pavé
 # com sombra.
 MIN_CALCADA, MAX_OBSTRUCAO = 0.20, 0.15
+
+# --------------------------------------------------------------------------- #
+# Avaliação automática da qualidade (scripts/inferencia)
+# --------------------------------------------------------------------------- #
+
+# O classificador de produção: um .joblib autocontido (pipeline do scikit-learn
+# + backbone + classes), gerado por `python -m scripts.inferencia.treinar`.
+# Os .joblib de data/models/v4/ (notebook 05) também servem: copie o do
+# Cenário 4 para cá. Sem o arquivo, a etapa 4 da coleta é pulada com um aviso.
+MODELO_QUALIDADE = RAIZ / "data" / "models" / "producao" / "classificador_qualidade.joblib"
+# Backbone que gera os embeddings, se o .joblib não disser qual: o mesmo de
+# scripts/transformacao/extract_features.py (token [CLS], 1024D).
+BACKBONE_QUALIDADE = "projectsidewalk/sidewalk-validator-ai-surfaceproblem"
+# Abaixo desta probabilidade, o modelo não arrisca: o quadrado vira "não
+# identificável" (fica fora da nota da rua). 0 desliga.
+CONFIANCA_MIN = 0.0
+LOTE_QUALIDADE = 16  # quadrados por passada no backbone

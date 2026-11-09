@@ -3,7 +3,7 @@
 Mapa de Curitiba com as ruas coletadas coloridas pela qualidade da calçada,
 num **gradiente** que vem das avaliações das fotos: de longe, cada rua tem a
 cor geral dela; de perto, aparece a qualidade de cada altura da rua. Na mesma
-página dá para avaliar as fotos à mão, exportar as avaliações para conferência
+página dá para corrigir à mão a avaliação do modelo, exportar as avaliações para conferência
 no Roboflow e disparar a coleta de uma rua nova.
 
 Tudo roda num programa só, o **coletor** (`Calcadas.exe`), 100% local. Ele
@@ -99,24 +99,32 @@ da zona mostra:
   - dentro, o nome de quem avalia ("Avaliando como", gravado com cada
     avaliação) e os quadrados, cada um com as cinco classes: adequada,
     parcialmente adequada, inadequada, sem calçada e não identificável.
+  - embaixo de cada quadrado, de onde veio a avaliação: "modelo · 87% de
+    confiança · cenario04-..." ou "à mão · Ana".
+
+As avaliações vêm do modelo, na etapa 4 da coleta ([scripts/inferencia](../inferencia/README.md)):
+avaliar à mão é só para corrigir. Uma avaliação manual vale mais que a do
+modelo e nunca é sobrescrita por ele, nem com `avaliar --refazer`.
 
 O painel fecha pelo `×`, por `Esc` ou com um clique fora dele.
 
 ### Coletar uma rua
 
 O nome é aceito como no menu do terminal (sem acento, abreviado...).
-"Procurar" mostra quantas zonas a rua tem e quantas faltam. "Coletar" roda a
+"Procurar" mostra quantas zonas a rua tem, quantas faltam e quantas fotos já
+coletadas estão sem avaliação; numa rua sem zonas a fazer, "Coletar" roda só
+a avaliação dessas fotos. "Coletar" roda a
 coleta da rua (`coleta_streetview rua`) num subprocesso do coletor.
 
 Enquanto a coleta roda:
 
-- A página mostra a etapa (1 de 3: panoramas, 2: fotos, 3: conferência das
-  calçadas) e uma barra de progresso, lidas do log da coleta.
+- A página mostra a etapa (1 de 4: panoramas, 2: fotos, 3: conferência das
+  calçadas, 4: avaliação da qualidade) e uma barra de progresso, lidas do log da coleta.
 - A janela do coletor, na aba "Últimas coletas", mostra a mesma coleta
   em cartões ([andamento.py](andamento.py)):
   - um selo com a situação: em andamento, concluída, cancelada ou falhou;
-  - as três etapas (procurando as fotos no Street View, baixando, conferindo
-    se há calçada), cada uma com a sua barra e quanto falta;
+  - as quatro etapas (procurando as fotos no Street View, baixando, conferindo
+    se há calçada, avaliando a qualidade), cada uma com a sua barra e quanto falta;
   - o resultado: quantas zonas ficaram com foto boa ou, num erro, a causa
     em palavras simples (sem internet, rua não encontrada...);
   - "Ver o registro completo", que abre o log inteiro.

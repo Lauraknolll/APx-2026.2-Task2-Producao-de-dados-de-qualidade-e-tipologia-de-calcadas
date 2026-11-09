@@ -1307,9 +1307,11 @@ function desenharQuadrados() {
       b.onclick = (ev) => { ev.stopPropagation(); foco = i; avaliar(q, atual === c ? null : c); };
       return b;
     });
-    const quem = q.avaliacao
-      ? `${q.avaliacao.origem === "modelo" ? "modelo" : "à mão"}${q.avaliacao.autor ? ` · ${q.avaliacao.autor}` : ""}`
-      : "sem avaliação";
+    const quem = !q.avaliacao ? "sem avaliação"
+      : q.avaliacao.origem === "modelo"
+        ? `modelo${q.avaliacao.confianca != null ? ` · ${Math.round(q.avaliacao.confianca * 100)}% de confiança` : ""}`
+          + `${q.avaliacao.autor ? ` · ${q.avaliacao.autor}` : ""} · clique numa classe para corrigir`
+        : `à mão${q.avaliacao.autor ? ` · ${q.avaliacao.autor}` : ""}`;
     const medidas = q.piso == null ? "" : `piso ${Math.round(q.piso * 100)}% · obstrução ${Math.round(q.obstrucao * 100)}%`;
     const cartao = el("div", { className: "quadrado" + (i === foco ? " foco" : "") },
       el("img", { src: q.url, alt: `Quadrado ${q.quadrado} da calçada`, loading: "lazy" }),
@@ -1413,10 +1415,12 @@ async function procurarRua(nome) {
     return;
   }
   statusColeta("");
-  $("confirmar-texto").textContent = `"${previa.nome}": ${previa.zonas} zonas, ${previa.processadas} já processadas, ${previa.a_fazer} a processar.`;
+  const semAvaliacao = previa.sem_avaliacao || 0;
+  $("confirmar-texto").textContent = `"${previa.nome}": ${previa.zonas} zonas, ${previa.processadas} já processadas, ${previa.a_fazer} a processar.`
+    + (semAvaliacao ? ` ${semAvaliacao} fotos já coletadas ainda sem avaliação: o modelo avalia.` : "");
   $("coleta-limite").max = previa.a_fazer;
   $("coleta-limite").value = "";
-  $("form-confirmar").querySelector("button[type=submit]").disabled = previa.a_fazer === 0;
+  $("form-confirmar").querySelector("button[type=submit]").disabled = previa.a_fazer === 0 && !semAvaliacao;
   $("form-confirmar").hidden = false;
 }
 
@@ -1434,16 +1438,17 @@ async function iniciarColeta() {
 
 // O andamento da coleta, lido do log do subprocesso: a etapa atual ("== 2/3
 // ...") e, dentro dela, o último contador "[i/n]".
-const ETAPAS = { 1: "Procurando os panoramas", 2: "Baixando as fotos", 3: "Conferindo as calçadas" };
+const ETAPAS = { 1: "Procurando os panoramas", 2: "Baixando as fotos", 3: "Conferindo as calçadas",
+  4: "Avaliando a qualidade" };
 function andamentoDoLog(log) {
-  let etapa = null, fracao = null;
+  let etapa = null, fracao = null, total = 4;
   for (const linha of log) {
-    const e = linha.match(/^== (\d)\/3 /);
-    if (e) { etapa = Number(e[1]); fracao = null; continue; }
+    const e = linha.match(/^== (\d)\/([34]) /);
+    if (e) { etapa = Number(e[1]); total = Number(e[2]); fracao = null; continue; }
     const p = linha.match(/\[(\d+)\/(\d+)\]/);
     if (p && etapa) fracao = Number(p[1]) / Number(p[2]);
   }
-  return { etapa, fracao };
+  return { etapa, fracao, total };
 }
 
 // Em vez do log, um carregamento: spinner, a etapa e uma barra (que anda
@@ -1456,9 +1461,9 @@ function mostrarColeta(estado) {
   if (!estado.rua) return;
   const minutos = Math.round(((estado.fim || Date.now() / 1000) - estado.inicio) / 60);
   if (estado.rodando) {
-    const { etapa, fracao } = andamentoDoLog(estado.log);
+    const { etapa, fracao, total } = andamentoDoLog(estado.log);
     $("coleta-titulo").textContent = `Coletando ${estado.rua}${estado.limite ? ` (${estado.limite} zonas)` : ""}`;
-    $("coleta-etapa").textContent = (etapa ? `Etapa ${etapa} de 3 · ${ETAPAS[etapa]}` : "Preparando")
+    $("coleta-etapa").textContent = (etapa ? `Etapa ${etapa} de ${total} · ${ETAPAS[etapa]}` : "Preparando")
       + ` · ${minutos} min`;
     $("coleta-trilho").classList.toggle("indeterminado", fracao === null);
     $("coleta-barra").style.width = fracao === null ? "" : `${100 * fracao}%`;

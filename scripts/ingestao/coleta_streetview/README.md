@@ -224,6 +224,7 @@ sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 | [streetview.py](streetview.py) | Panoramas do Google e recorte de vistas em perspectiva a partir dos tiles |
 | [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `data/processed/downloads-ruas/<rua>/` e o `indice.csv` |
 | [etapas.py](etapas.py) | As etapas: 1. `coletar` (zonas e vistas candidatas), 2. `baixar` (closes, quadrados, vistas de contexto), 3. `segmentar` (piso e obstrução de cada quadrado) e `reavaliar` |
+| [../../inferencia/etapa.py](../../inferencia/etapa.py) | 4. `avaliar`: qualidade de cada quadrado com o modelo de produção (ver [scripts/inferencia](../../inferencia/README.md)) |
 | [calibracao.py](calibracao.py) | Gabarito humano dos quadrados (`rotular`) e varredura dos limites do filtro contra ele (`calibrar`) |
 | [cli.py](cli.py) | Menu interativo e subcomandos |
 

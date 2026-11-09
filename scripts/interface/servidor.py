@@ -13,7 +13,8 @@ página (static/), que lê e grava no banco da coleta
     POST /api/exportacao      {modo, rua, quadrados: [{ponto_id, posicao, quadrado, quando}]}:
                               registra o .zip que a página montou
     GET  /api/coleta          a coleta em andamento (ou a última): situação, resumo ou erro, e o log
-    POST /api/coleta/previa   {nome}: a rua que o nome indica e quantas zonas dela faltam
+    POST /api/coleta/previa   {nome}: a rua que o nome indica, quantas zonas dela faltam e quantas
+                              fotos já coletadas ainda não têm avaliação (o modelo avalia)
     POST /api/coleta          {nome, limite?}: roda a coleta da rua (nome oficial, da prévia)
     POST /api/coleta/parar    interrompe a coleta (ela continua de onde parou na próxima)
     GET  /img/quadrados/<zona>_<posicao>_<k>.jpg, /img/contexto/<zona>_<posicao>.jpg
@@ -44,6 +45,7 @@ from scripts.ingestao.coleta_streetview.banco import AGORA_MS, abrir_db, pasta_d
 from scripts.ingestao.coleta_streetview.config import DB_PATH, PASTA_IMAGENS, RAIZ
 from scripts.ingestao.coleta_streetview.etapas import zonas_da_rua
 from scripts.ingestao.coleta_streetview.geometria import OverpassIndisponivel, RuaAmbigua, RuaNaoEncontrada
+from scripts.inferencia.etapa import contar_sem_avaliacao
 
 from .mapa import ruas, zonas
 
@@ -193,7 +195,7 @@ def api_dados() -> dict:
         return {"ruas": ruas(conn), "zonas": zonas(conn)}
 
 
-CAMPOS_AVALIACAO = ("ponto_id", "posicao", "quadrado", "classe", "origem", "autor", "quando")
+CAMPOS_AVALIACAO = ("ponto_id", "posicao", "quadrado", "classe", "origem", "autor", "confianca", "quando")
 
 
 def api_avaliacoes() -> dict:
@@ -262,9 +264,11 @@ def api_previa_coleta(corpo: dict) -> tuple[int, dict]:
         return HTTPStatus.NOT_FOUND, {"erro": f'"{oficial}" existe no OpenStreetMap, mas não tem calçadas na camada do IPPUC.'}
     with conectar() as conn:
         status = {tuple(chave): s for *chave, s in conn.execute("SELECT fid, anel, ordem, status FROM pontos")}
+        sem_avaliacao = contar_sem_avaliacao(conn, oficial)
     a_fazer = sum(1 for z in zonas if status.get(z[0]) not in ("aprovada", "recoleta"))
+    # As fotos já coletadas sem avaliação: "Coletar" numa rua sem zonas a fazer roda só o modelo (cli.cmd_rua).
     return HTTPStatus.OK, {"nome": oficial, "zonas": len(zonas), "processadas": len(zonas) - a_fazer,
-                           "a_fazer": a_fazer}
+                           "a_fazer": a_fazer, "sem_avaliacao": sem_avaliacao}
 
 
 def api_iniciar_coleta(corpo: dict) -> tuple[int, dict]:

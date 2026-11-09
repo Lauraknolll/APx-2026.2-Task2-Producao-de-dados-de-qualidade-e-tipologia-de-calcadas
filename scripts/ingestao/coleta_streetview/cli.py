@@ -9,6 +9,7 @@ etapas continuam disponíveis como subcomandos, para rodar uma de cada vez:
     baixar     closes, quadrados e vistas de contexto
     segmentar  quadrados limpos, escolha da vista de cada zona, data/processed/downloads-ruas/
     reavaliar  refaz a escolha com outros limites, sem baixar nem segmentar
+    avaliar    qualidade de cada quadrado com o modelo (scripts/inferencia), sem avaliação manual
     rotular    gabarito humano dos quadrados, para calibrar o filtro
     calibrar   varre os limites do filtro contra o gabarito
 """
@@ -120,13 +121,28 @@ def _publicar_supabase(nome_osm: str, args):
         print(f"  (Supabase: não foi possível publicar — os dados locais estão salvos.)\n   {exc}")
 
 
+def _avaliar_rua(nome_osm: str, etapa, conn: sqlite3.Connection) -> int:
+    """Etapa 4: o modelo avalia os quadrados da rua que ainda não têm avaliação.
+    Uma falha aqui (sem modelo, sem rede para baixar o backbone) só avisa: as
+    fotos já estão salvas e `avaliar` pode rodar depois."""
+    print("\n== 4/4 Qualidade das calçadas: avaliação automática")
+    try:
+        from scripts.inferencia.etapa import cmd_avaliar
+        return cmd_avaliar(etapa("avaliar", "--rua", nome_osm), conn)
+    except Exception as exc:
+        print(f"  (Avaliação automática: não foi possível — as fotos estão salvas.)\n   {type(exc).__name__}: {exc}")
+        return 0
+
+
 def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
     """
     Uma rua do começo ao fim: coleta, closes e quadrados, segmentação e
     escolha da melhor vista de cada zona, capturas históricas onde nenhuma
-    recente serviu e, por fim, data/processed/downloads-ruas/<rua>/. Com um limite, roda só
-    N zonas ainda sem resultado, espalhadas pela rua — da coleta em diante.
-    Pode ser interrompido e rodado de novo: continua de onde parou.
+    recente serviu, data/processed/downloads-ruas/<rua>/ e, por fim, a
+    avaliação automática da qualidade de cada quadrado (scripts/inferencia).
+    Com um limite, roda só N zonas ainda sem resultado, espalhadas pela rua —
+    da coleta em diante. Pode ser interrompido e rodado de novo: continua de
+    onde parou.
     """
     def etapa(*argv, **extra):
         etapa_args = parser.parse_args(argv)
@@ -143,6 +159,10 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
     if not a_fazer:
         print("Nada a fazer. Para refazer zonas, use os comandos de etapa com --refazer.")
         print(resumo_exportacao(exportar_ruas(conn)))
+        # As fotos já estão aí; falta, talvez, a avaliação delas (coletadas antes do modelo).
+        if (avaliados := _avaliar_rua(nome_osm, etapa, conn)):
+            print(f"Avaliados pelo modelo: {avaliados} quadrados.")
+            _publicar_supabase(nome_osm, args)
         return
     limite = args.limite if args.limite else (None if args.nome else perguntar_quantidade(len(a_fazer)))
     if limite and limite < len(a_fazer):
@@ -152,7 +172,7 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
         escolhidas = a_fazer
 
     t0 = time.time()
-    print(f"\n== 1/3 Zonas e panoramas ({len(escolhidas)} zonas)")
+    print(f"\n== 1/4 Zonas e panoramas ({len(escolhidas)} zonas)")
     cmd_coletar(etapa("coletar", "--rua", nome_osm, apenas=set(escolhidas)), conn)
     conjunto = set(escolhidas)
     ids = [pid for pid, *chave in conn.execute("SELECT id, fid, anel, ordem FROM pontos")
@@ -162,11 +182,13 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
     # Primeira leva: capturas recentes; as seguintes, só históricas das zonas
     # em que nenhuma recente passou no filtro.
     for leva in range(1, 4):
-        print(f"\n== 2/3 Closes e quadrados (leva {leva})")
+        print(f"\n== 2/4 Closes e quadrados (leva {leva})")
         if not cmd_baixar(etapa("baixar", "--rua", nome_osm, *so_estas), conn):
             break
-        print(f"\n== 3/3 Calçada ou não: segmentação dos quadrados (leva {leva})")
+        print(f"\n== 3/4 Calçada ou não: segmentação dos quadrados (leva {leva})")
         cmd_segmentar(etapa("segmentar", "--rua", nome_osm, *so_estas), conn)
+
+    avaliados = _avaliar_rua(nome_osm, etapa, conn)
 
     situacao = _situacao(conn, zonas)
     rodadas = [situacao.get(c) for c in escolhidas]
@@ -178,6 +200,8 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
           f"{rodadas.count('aprovada')} com foto, {rodadas.count('recoleta')} sem foto boa.")
     print(f"  Na rua: {total.count('aprovada')} de {len(zonas)} zonas com foto; "
           f"{quadrados} quadrados de calçada em {pasta_da_rua(nome_osm).relative_to(config.RAIZ)}/")
+    if avaliados:
+        print(f"Avaliados pelo modelo: {avaliados} quadrados.")
     _publicar_supabase(nome_osm, args)
 
 
@@ -251,6 +275,15 @@ def criar_parser() -> argparse.ArgumentParser:
         p.add_argument("--max-obstrucao", type=float, default=config.MAX_OBSTRUCAO,
                        help="fração máxima do quadrado tampada por veículos, pessoas ou pelo borrão "
                             f"do carro do Google (default: {config.MAX_OBSTRUCAO})")
+    avaliar = sub.add_parser("avaliar", help="qualidade de cada quadrado com o modelo de produção "
+                                             "(as avaliações manuais nunca são trocadas)")
+    avaliar.add_argument("--refazer", action="store_true",
+                         help="refaz as avaliações do modelo (ex.: depois de trocar o .joblib)")
+    avaliar.add_argument("--modelo", type=Path,
+                         help=f"outro .joblib (default: {config.MODELO_QUALIDADE.relative_to(config.RAIZ)})")
+    avaliar.add_argument("--confianca-min", type=float,
+                         help="abaixo disso, o quadrado vira 'não identificável' "
+                              f"(default: {config.CONFIANCA_MIN})")
     rotular = sub.add_parser("rotular", help="gabarito humano: rótulo de cada quadrado segmentado, numa janela")
     rotular.add_argument("--limite", type=int, help="só N quadrados nesta sessão")
     rotular.add_argument("--autor", help="quem está rotulando (gravado com cada rótulo)")
@@ -261,7 +294,7 @@ def criar_parser() -> argparse.ArgumentParser:
                           help="fração mínima das fotos aprovadas que devem ser calçada avaliável (default: 0.9)")
     calibrar.add_argument("--listar", type=int, default=15,
                           help="quantas calçadas boas descartadas listar (default: 15)")
-    for p in (baixar, segmentar, rotular, calibrar):
+    for p in (baixar, segmentar, avaliar, rotular, calibrar):
         p.add_argument("--rua", help="só as zonas de uma rua já coletada com coletar --rua")
         p.add_argument("--zonas", help="só estas zonas (ids separados por vírgula)")
 
@@ -275,6 +308,9 @@ def main(argv: Optional[list[str]] = None):
     conn = abrir_db()
     if args.comando == "rua":
         cmd_rua(args, conn, parser)
+    elif args.comando == "avaliar":
+        from scripts.inferencia.etapa import cmd_avaliar
+        cmd_avaliar(args, conn)
     else:
         {"coletar": cmd_coletar, "baixar": cmd_baixar, "segmentar": cmd_segmentar,
          "reavaliar": cmd_reavaliar, "rotular": cmd_rotular,

@@ -61,7 +61,7 @@ esquerda:
    teste rápido, ponha 2 ou 3.
 4. Clique em **Coletar**.
 
-A coleta tem três etapas:
+A coleta tem quatro etapas:
 
 1. **Procurando as fotos no Street View:** acha as fotos disponíveis perto
    de cada trecho.
@@ -71,6 +71,14 @@ A coleta tem três etapas:
    carros e pessoas. **A primeira coleta demora alguns minutos a mais
    nesta etapa**, porque baixa o modelo de IA (~110 MB). Isso acontece uma
    vez só.
+
+4. **Avaliando a qualidade das calçadas:** outra inteligência artificial dá
+   a cada foto uma classe (*adequada*, *inadequada* ou *não identificável*),
+   que pinta a rua no mapa. Ninguém precisa avaliar à mão. Na primeira vez,
+   ela também baixa o modelo dela (~1,2 GB), uma vez só.
+
+Procurar uma rua que já foi coletada antes do modelo existir mostra quantas
+fotos ainda estão sem avaliação; *Coletar* avalia só essas.
 
 Enquanto isso, a aba **Últimas coletas** da janela mostra cada etapa com uma
 barra de progresso. As fotos aparecem no mapa ao fim de cada etapa.
@@ -115,8 +123,14 @@ no Google Maps.
 
 ## Avaliar as calçadas
 
+As fotos já chegam avaliadas pelo modelo (etapa 4 da coleta). Avaliar à mão
+é opcional: serve para **corrigir** o modelo quando ele erra. Uma correção
+manual nunca é desfeita pelo modelo.
+
 No mapa, clique num trecho colorido, num ponto de foto ou numa zona da lista
-de ruas. Em **Avaliar**, dê a cada quadrado da foto uma das cinco classes:
+de ruas. Em **Avaliar**, cada quadrado mostra a classe que o modelo deu e a
+confiança dele (ex.: "modelo · 87% de confiança"). Para corrigir, dê ao
+quadrado uma das cinco classes:
 *adequada*, *parcialmente adequada*, *inadequada*, *sem calçada* ou *não
 identificável*. As teclas `1` a `5` também servem.
 

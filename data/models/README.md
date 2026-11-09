@@ -10,6 +10,10 @@ Este diretório centraliza os pesos e pipelines treinados para os dados de calç
 
 ```
 data/models/
+├── producao/                                              # O modelo que a coleta usa (scripts/inferencia)
+│   ├── classificador_qualidade.joblib                     # Cenário 4, gerado por `python -m scripts.inferencia.treinar`
+│   └── classificador_qualidade.json                       # Resumo legível: classes, backbone, métricas
+│
 ├── v4/                                                    # Modelos treinados com Dataset v4 (10 ruas, 1.171 imagens)
 │   ├── tagger_sem_brick.pth                               # Cabeça linear (11 classes) sem falso-positivo de petit-pavé
 │   ├── classificador_cenario04_3classes_com_naoid.joblib  # Pipeline MLP Cenário 4 (Adequada | Inadequada Geral | Não ID)

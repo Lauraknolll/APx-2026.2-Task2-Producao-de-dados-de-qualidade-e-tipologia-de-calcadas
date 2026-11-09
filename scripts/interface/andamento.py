@@ -1,11 +1,11 @@
 """
 As últimas coletas, na janela do .exe (janela.py), sem linguagem de código:
 cada coleta vira um cartão com a rua, um selo (em andamento, concluída,
-cancelada, falhou), as três etapas com uma barra de progresso cada e o
+cancelada, falhou), as quatro etapas com uma barra de progresso cada e o
 resultado em português simples.
 
 resumir() lê o log da coleta (o que o coleta_streetview escreve: as etapas
-"== 1/3 ...", os contadores "[i/n]" e a linha final "Pronto: ...");
+"== 1/4 ...", os contadores "[i/n]" e a linha final "Pronto: ...");
 ListaDeColetas desenha os cartões num Canvas com rolagem. O log inteiro
 continua no arquivo (data/processed/coletas/), a um clique.
 """
@@ -19,7 +19,8 @@ from typing import Optional
 
 from PIL import Image, ImageTk
 
-ETAPAS = ("Procurando as fotos no Street View", "Baixando as fotos", "Conferindo se há calçada nas fotos")
+ETAPAS = ("Procurando as fotos no Street View", "Baixando as fotos", "Conferindo se há calçada nas fotos",
+          "Avaliando a qualidade das calçadas")
 ETAPAS_DE_NOVO = {2: "Baixando fotos mais antigas", 3: "Conferindo as fotos mais antigas"}  # da 2ª leva em diante
 SELOS = {"andamento": ("Em andamento", "aviso"), "concluida": ("Concluída", "ok"),
          "cancelada": ("Cancelada", "suave"), "falhou": ("Falhou", "perigo")}
@@ -60,13 +61,14 @@ def resumir(linhas: list[str], situacao: str, rua: str, arquivo: Optional[Path] 
     estado: feita, rodando, esperando, parou (cancelada ou falhou) ou pulada.
     """
     etapa, leva, fracoes, vistas, zonas, nova_leva = 0, 1, {}, {}, None, None
-    pronto = na_rua = nada = None
+    pronto = na_rua = nada = avaliados = sem_modelo = None
+    total = 4  # coletas de antes da avaliação automática têm 3 etapas ("== 1/3 ...")
     for linha in linhas:
         linha = linha.strip()
         if m := re.match(r"^\$ .*--limite (\d+)", linha):
             zonas = int(m[1])
-        elif m := re.match(r"^== (\d)/3 ", linha):
-            n = int(m[1])
+        elif m := re.match(r"^== (\d)/([34]) ", linha):
+            n, total = int(m[1]), int(m[2])
             if z := re.search(r"\((\d+) zonas\)", linha):
                 zonas = int(z[1])
             lv = re.search(r"\(leva (\d+)\)", linha)
@@ -95,10 +97,17 @@ def resumir(linhas: list[str], situacao: str, rua: str, arquivo: Optional[Path] 
             na_rua = linha
         elif linha.startswith("Nada a fazer"):
             nada = linha
+        elif m := re.match(r"^Avaliados pelo modelo: (\d+)", linha):
+            avaliados = int(m[1])
+        elif linha.startswith("Sem modelo de qualidade") or "Avaliação automática: não foi possível" in linha:
+            sem_modelo = True
 
     etapas = []
-    for n in (1, 2, 3):
+    for n in range(1, total + 1):
         nome = ETAPAS_DE_NOVO[n] if leva > 1 and n in ETAPAS_DE_NOVO else ETAPAS[n - 1]
+        if n == 4 and sem_modelo and n in fracoes:
+            etapas.append({"nome": nome, "estado": "pulada", "fracao": 0, "texto": "Sem modelo"})
+            continue
         if n not in fracoes:  # não começou
             if situacao == "andamento":
                 estado, texto = "esperando", "Aguardando"
@@ -115,22 +124,28 @@ def resumir(linhas: list[str], situacao: str, rua: str, arquivo: Optional[Path] 
             if fracao is None:
                 texto = "Preparando…"
             else:
-                feitos, total = vistas[n]
+                feitos, de = vistas[n]
                 unidade = "zonas" if n == 1 else "fotos"
-                texto = f"{feitos} de {total} {unidade}"
+                texto = f"{feitos} de {de} {unidade}"
             etapas.append({"nome": nome, "estado": "rodando", "fracao": fracao, "texto": texto})
         else:
             etapas.append({"nome": nome, "estado": "parou", "fracao": fracoes[n] or 0,
                            "texto": "Cancelada" if situacao == "cancelada" else "Falhou"})
 
     if situacao == "concluida":
-        if nada:
-            resultado = ("Nada a fazer: as zonas dessa rua já tinham sido coletadas.", "suave")
+        if nada and avaliados:
+            resultado = (f"As zonas dessa rua já tinham sido coletadas; o modelo avaliou {avaliados} fotos.", "ok")
+        elif nada:
+            resultado = ("Nada a fazer: as zonas dessa rua já tinham sido coletadas e avaliadas.", "suave")
         elif pronto and (m := re.search(r"(\d+) com foto, (\d+) sem foto boa", pronto)):
             com, sem = int(m[1]), int(m[2])
             texto = (f"{com + sem} zonas coletadas: {com} com foto boa" + (f", {sem} sem foto boa." if sem else "."))
             if na_rua and (r := re.search(r"(\d+) de (\d+) zonas com foto", na_rua)):
                 texto += f" A rua tem {r[1]} de {r[2]} zonas com foto."
+            if avaliados:
+                texto += f" O modelo avaliou {avaliados} fotos."
+            elif sem_modelo:
+                texto += " Sem modelo de qualidade: as fotos ficam para avaliar à mão."
             resultado = (texto, "ok")
         else:
             resultado = ("Coleta concluída.", "ok")
