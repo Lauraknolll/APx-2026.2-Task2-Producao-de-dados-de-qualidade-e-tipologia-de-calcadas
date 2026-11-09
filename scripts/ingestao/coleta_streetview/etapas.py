@@ -219,7 +219,7 @@ def cmd_coletar(args, conn: sqlite3.Connection):
             status = _gravar_zona(conn, chave, lat, lon, resultado, recusados.get(pid, set()))
             cont[status] += 1
             n_tentativas += len(resultado[0]) if status == "pendente" else 0
-            if i % 25 == 0 or i == len(trabalhos):
+            if i % 5 == 0 or i == len(trabalhos):  # a cada 5: a barra da interface anda (andamento.py)
                 conn.commit()
                 print(f"  [{i}/{len(trabalhos)}] {cont['pendente']} com panorama, "
                       f"{cont['recoleta']} sem ({time.time() - t0:.0f}s)")
@@ -393,7 +393,9 @@ def cmd_segmentar(args, conn: sqlite3.Connection):
     if args.mascaras:
         (PASTA_IMAGENS / "mascaras").mkdir(parents=True, exist_ok=True)
 
-    for ponto_id, arquivo, recorte in linhas:
+    for i, (ponto_id, arquivo, recorte) in enumerate(linhas, 1):
+        if i == 1 or i % 5 == 0:  # o andamento, para a interface (a vista i está começando)
+            print(f"  [{i - 1}/{len(linhas)}] vistas segmentadas", flush=True)
         # Segmenta a vista de contexto e mede só o retângulo que é o close.
         contexto = Image.open(RAIZ / Path(arquivo).parent / "contexto" / Path(arquivo).name).convert("RGB")
         with torch.no_grad():
@@ -438,6 +440,7 @@ def cmd_segmentar(args, conn: sqlite3.Connection):
                                   outline="yellow" if limpo else "red", width=3)
             masc.save(PASTA_IMAGENS / "mascaras" / Path(arquivo).name, quality=85)
     conn.commit()
+    print(f"  [{len(linhas)}/{len(linhas)}] vistas segmentadas", flush=True)
 
     cont = {"aprovada": 0, "pendente": 0, "recoleta": 0}
     for (ponto_id,) in conn.execute(f"""

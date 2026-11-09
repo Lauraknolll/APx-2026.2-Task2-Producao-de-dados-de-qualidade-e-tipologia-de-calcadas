@@ -9,6 +9,7 @@
 - [Sobre o AP[x]](#-sobre-o-apx)
 - [Objetivos](#-objetivos)
 - [Estrutura](#-estrutura)
+- [Coletor de calçadas](#-coletor-de-calçadas)
 - [Como Usar](#-como-usar)
 - [Regras](#-regras)
 - [Fluxo de Trabalho](#-fluxo-de-trabalho)
@@ -45,6 +46,22 @@ Cada estudante pode dedicar **até 120 horas por semestre** ao projeto, e as ati
 ```
 
 Cada pasta possui um `README.md` próprio com detalhes de uso.
+
+---
+
+## 📸 Coletor de calçadas
+
+Programa para Windows (`Calcadas.exe`) que coleta fotos das calçadas de
+Curitiba no Google Street View, escolhe a melhor foto de cada trecho de rua
+com uma IA de segmentação e mostra num mapa a qualidade das calçadas. No mapa
+dá para avaliar cada foto e exportar as avaliações para o Roboflow. Tudo fica
+no computador de quem coleta.
+
+- **Para usar o programa** (quem recebeu o `.zip`): [guia de uso](docs/coletor-de-calcadas.md).
+- **Para desenvolver e gerar o `.exe`**: [scripts/interface](scripts/interface/README.md)
+  (a janela, o mapa e o `.exe`) e
+  [scripts/ingestao/coleta_streetview](scripts/ingestao/coleta_streetview/README.md)
+  (a coleta, pelo terminal).
 
 ---
 

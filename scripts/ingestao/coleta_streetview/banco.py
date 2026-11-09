@@ -16,6 +16,13 @@ tudo retomável: interromper e rodar de novo continua de onde parou.
     parametros  o espaçamento das zonas (muda a identidade delas).
     rotulos     o gabarito humano de cada quadrado, para calibrar o filtro
                 (calibracao.py).
+    avaliacoes  a qualidade da calçada em cada quadrado (CLASSES_AVALIACAO),
+                dada à mão na interface do mapa (scripts/interface) ou por
+                um modelo; é o que colore as ruas no mapa.
+    exportacoes cada exportação das avaliações para conferência no Roboflow
+                (seção "Exportar para conferência" da interface).
+    exportados  a avaliação de cada quadrado que foi exportada por último:
+                uma avaliação mais recente que ela (ou sem ela) é nova.
 
 Escolha da vista — um quadrado é LIMPO quando tem piso de calçada >=
 MIN_CALCADA e obstrução na frente (veículo + pessoa + borrão do carro) <=
@@ -111,6 +118,35 @@ ESQUEMA = """
         PRIMARY KEY (ponto_id, posicao, quadrado)
     );
 
+    CREATE TABLE IF NOT EXISTS avaliacoes (       -- qualidade da calçada (interface do mapa ou modelo)
+        ponto_id   INTEGER NOT NULL,
+        posicao    INTEGER NOT NULL,              -- a vista (tentativas.posicao)
+        quadrado   INTEGER NOT NULL,              -- 1..3, da esquerda para a direita
+        classe     TEXT NOT NULL,                 -- CLASSES_AVALIACAO
+        origem     TEXT NOT NULL,                 -- manual | modelo
+        autor      TEXT,                          -- quem avaliou, ou o nome do modelo
+        confianca  REAL,                          -- probabilidade da classe, se veio de um modelo
+        quando     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- UTC; reavaliar regrava (AGORA_MS)
+        PRIMARY KEY (ponto_id, posicao, quadrado)
+    );
+
+    CREATE TABLE IF NOT EXISTS exportacoes (      -- cada .zip para conferência (interface do mapa)
+        id         INTEGER PRIMARY KEY,
+        quando     TEXT NOT NULL,                 -- UTC (AGORA_MS)
+        modo       TEXT NOT NULL,                 -- tudo | novas
+        rua        TEXT,                          -- só esta rua; NULL = todas
+        quadrados  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS exportados (       -- a avaliação de cada quadrado que foi exportada por último
+        ponto_id          INTEGER NOT NULL,
+        posicao           INTEGER NOT NULL,
+        quadrado          INTEGER NOT NULL,
+        quando_avaliacao  TEXT NOT NULL,          -- avaliacoes.quando da avaliação que foi no .zip
+        exportacao_id     INTEGER NOT NULL,       -- exportacoes.id
+        PRIMARY KEY (ponto_id, posicao, quadrado)
+    );
+
     CREATE TABLE IF NOT EXISTS uploads_roboflow (
         rua_slug        TEXT NOT NULL,
         arquivo         TEXT NOT NULL,             -- ex: "1_4_1.jpg"
@@ -129,6 +165,7 @@ _MIGRACOES = {
     "tentativas": [("alvo_lat", "REAL"), ("alvo_lon", "REAL"), ("desvio", "REAL"),
                    ("recorte", "TEXT"), ("obstrucao", "TEXT"), ("quadrados", "TEXT")],
     "pontos": [("quadrados", "TEXT")],
+    "exportacoes": [("rua", "TEXT")],
 }
 
 
@@ -271,6 +308,37 @@ def registrar_rejeicao(conn: sqlite3.Connection, ponto_id: int, motivo: str):
     conn.execute("UPDATE tentativas SET rejeicao = ? WHERE ponto_id = ? AND posicao = ?",
                  (f"recusada: {motivo}", ponto_id, tentativa))
     decidir_zona(conn, ponto_id)
+    conn.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Avaliação da qualidade
+# --------------------------------------------------------------------------- #
+
+# Na ordem dos rótulos do classificador (scripts/modelagem/linear_probe.py):
+# o índice da classe é o rótulo numérico do modelo. `parcialmente_adequada`
+# veio depois e vai no fim, para os rótulos das outras não mudarem.
+CLASSES_AVALIACAO = ("adequada", "inadequada", "sem_calcada", "nao_identificavel", "parcialmente_adequada")
+
+# Agora (UTC) com milissegundos, em SQL: "2026-10-24 21:16:41.732". Compara
+# como texto com o CURRENT_TIMESTAMP das avaliações antigas (sem fração).
+AGORA_MS = "strftime('%Y-%m-%d %H:%M:%f', 'now')"
+
+
+def registrar_avaliacao(conn: sqlite3.Connection, ponto_id: int, posicao: int, quadrado: int,
+                        classe: Optional[str], origem: str = "manual", autor: Optional[str] = None,
+                        confianca: Optional[float] = None):
+    """Grava (ou troca) a avaliação de um quadrado; classe None apaga a que houver."""
+    if classe is None:
+        conn.execute("DELETE FROM avaliacoes WHERE ponto_id = ? AND posicao = ? AND quadrado = ?",
+                     (ponto_id, posicao, quadrado))
+    elif classe not in CLASSES_AVALIACAO:
+        raise ValueError(f"classe desconhecida: {classe!r} (use uma de {', '.join(CLASSES_AVALIACAO)})")
+    else:
+        # `quando` é regravado: uma reavaliação conta como nova para a exportação.
+        conn.execute("INSERT OR REPLACE INTO avaliacoes (ponto_id, posicao, quadrado, classe, origem, autor, "
+                     f"confianca, quando) VALUES (?, ?, ?, ?, ?, ?, ?, {AGORA_MS})",
+                     (ponto_id, posicao, quadrado, classe, origem, autor, confianca))
     conn.commit()
 
 

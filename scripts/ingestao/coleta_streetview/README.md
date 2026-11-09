@@ -238,6 +238,8 @@ Cada módulo abre com uma docstring que explica o que faz e como.
 | `pontos_rua` | A que rua do OSM cada zona pertence (uma zona de esquina pode estar em duas). |
 | `parametros` | O tamanho das zonas. |
 | `rotulos` | O gabarito humano de cada quadrado (`rotular`), usado por `calibrar`. |
+| `avaliacoes` | A qualidade da calçada em cada quadrado (adequada, parcialmente adequada, inadequada, sem calçada, não identificável), dada à mão no [mapa](../../interface/README.md) ou por um modelo. É o que colore as ruas no mapa. |
+| `exportacoes`, `exportados` | Cada exportação das avaliações para conferência no Roboflow, e a avaliação de cada quadrado que foi no último `.zip` (o que define as avaliações "novas"). |
 
 A etapa de avaliação pode recusar a vista escolhida de uma zona com
 `scripts.ingestao.coleta_streetview.banco.registrar_rejeicao(conn, zona, motivo)`: a zona passa para
