@@ -14,6 +14,7 @@ etapas continuam disponíveis como subcomandos, para rodar uma de cada vez:
 """
 
 import argparse
+import os
 import sqlite3
 import sys
 import time
@@ -98,6 +99,27 @@ def perguntar_quantidade(maximo: int) -> Optional[int]:
         print(f"Digite um número de 1 a {maximo}, ou Enter para todas.")
 
 
+def _publicar_supabase(nome_osm: str, args):
+    """
+    Publica a rua recém-processada no Supabase, se as credenciais estiverem no
+    ambiente (SUPABASE_URL e SUPABASE_SERVICE_KEY). Roda sozinho no fim do fluxo
+    'rua' — os dados locais já estão salvos, então uma falha aqui só avisa e não
+    derruba a coleta. Use --sem-supabase para pular.
+    """
+    if getattr(args, "sem_supabase", False):
+        return
+    if not (os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY")):
+        return  # não configurado: segue só local (o comando 'sync' pode publicar depois)
+    try:
+        from argparse import Namespace
+
+        from scripts.sync.supabase_sync import sincronizar
+        print("\n== Publicando no Supabase")
+        sincronizar(Namespace(db=config.DB_PATH, rua=nome_osm, force=False, dry_run=False))
+    except Exception as exc:  # os dados locais estão salvos; só avisa
+        print(f"  (Supabase: não foi possível publicar — os dados locais estão salvos.)\n   {exc}")
+
+
 def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
     """
     Uma rua do começo ao fim: coleta, closes e quadrados, segmentação e
@@ -156,6 +178,7 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
           f"{rodadas.count('aprovada')} com foto, {rodadas.count('recoleta')} sem foto boa.")
     print(f"  Na rua: {total.count('aprovada')} de {len(zonas)} zonas com foto; "
           f"{quadrados} quadrados de calçada em {pasta_da_rua(nome_osm).relative_to(config.RAIZ)}/")
+    _publicar_supabase(nome_osm, args)
 
 
 # --------------------------------------------------------------------------- #
@@ -177,6 +200,9 @@ def criar_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("rua", help="uma rua do começo ao fim (é o que roda sem argumentos)")
     p.add_argument("--nome", help='nome da rua, como se escreve ("R. comendador araujo" serve); sem isso, pergunta')
     p.add_argument("--limite", type=int, help="só N zonas, espalhadas pela rua; sem isso, todas as que faltam")
+    p.add_argument("--sem-supabase", action="store_true",
+                   help="não publica no Supabase no fim (por padrão publica se SUPABASE_URL e "
+                        "SUPABASE_SERVICE_KEY estiverem no ambiente)")
 
     p = sub.add_parser("coletar", help="zonas de calçada e vistas candidatas (só metadados)")
     p.add_argument("--rua", help='só uma rua, ex: "Rua XV de Novembro" (ignora --bbox)')
