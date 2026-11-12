@@ -24,3 +24,7 @@ pycryptodome
 torch
 torchvision
 transformers
+
+# Avaliação automática da qualidade (scripts/inferencia): o .joblib é um pipeline do scikit-learn
+scikit-learn
+joblib
