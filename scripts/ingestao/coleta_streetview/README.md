@@ -110,6 +110,34 @@ Cada zona tem ~4 vistas candidatas. Com a segmentação na CPU, uma rua de ~50
 zonas leva uns 20 minutos; uma avenida longa (~250 zonas, ~1.000 vistas),
 perto de uma hora e meia.
 
+### Várias ruas de uma vez (lote)
+
+Para não digitar rua por rua, há um **catálogo** de todas as vias de Curitiba,
+já classificadas (avenida, arterial, coletora, local...), e um comando `lote`
+que coleta várias de uma vez a partir dele.
+
+```powershell
+# 1) gera o catálogo em data/raw/ruas_osm/ruas_curitiba_classificadas.csv
+python -m scripts.ingestao.coleta_streetview.catalogo_ruas
+
+# 2) coleta as vias de maior fluxo, 15 zonas por rua
+python -m scripts.ingestao.coleta_streetview lote `
+    --categoria "Via expressa / rodovia,Arterial principal,Arterial secundária,Coletora" `
+    --limite-por-rua 15
+```
+
+O catálogo sai ordenado das principais (topo) para as locais. A coluna
+`categoria` é o que o `lote --categoria` filtra (valores exatos, separados por
+vírgula; sem `--categoria`, todas as ~9.700 vias). Outras opções do `lote`:
+`--limite-por-rua` (zonas por rua), `--max-ruas` (quantas ruas nesta rodada),
+`--min-comprimento` (ignora ruas curtas), `--incluir-ruido` (não pula
+Acesso/Condomínio/Estação/...) e `--sem-supabase`.
+
+O `lote` reusa o fluxo `rua` em cada via: é **idempotente** (pula o que já foi
+coletado, retoma de onde parou) e uma rua que falhe é pulada sem derrubar o
+resto. O catálogo serve só para escolher o que coletar; não muda nada na
+coleta em si.
+
 ### Etapa por etapa
 
 O menu roda estas etapas em sequência; elas também existem como subcomandos
@@ -225,7 +253,8 @@ sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 | [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `data/processed/downloads-ruas/<rua>/` e o `indice.csv` |
 | [etapas.py](etapas.py) | As etapas: 1. `coletar` (zonas e vistas candidatas), 2. `baixar` (closes, quadrados, vistas de contexto), 3. `segmentar` (piso e obstrução de cada quadrado) e `reavaliar` |
 | [calibracao.py](calibracao.py) | Gabarito humano dos quadrados (`rotular`) e varredura dos limites do filtro contra ele (`calibrar`) |
-| [cli.py](cli.py) | Menu interativo e subcomandos |
+| [cli.py](cli.py) | Menu interativo e subcomandos (inclui `lote`: coleta várias ruas do catálogo) |
+| [catalogo_ruas.py](catalogo_ruas.py) | Gera `data/raw/ruas_osm/ruas_curitiba_classificadas.csv`: todas as vias de Curitiba classificadas (categoria, comprimento), para escolher o que coletar com `lote` |
 
 Cada módulo abre com uma docstring que explica o que faz e como.
 

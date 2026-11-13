@@ -2,8 +2,10 @@
 Linha de comando: `python -m scripts.ingestao.coleta_streetview`.
 
 Sem argumentos, abre o menu: pergunta a rua (qualquer rua de Curitiba, pelo
-nome) e quantas zonas rodar, e faz tudo, do começo ao fim (comando `rua`). As
-etapas continuam disponíveis como subcomandos, para rodar uma de cada vez:
+nome) e quantas zonas rodar, e faz tudo, do começo ao fim (comando `rua`). O
+comando `lote` coleta várias ruas de uma vez, lendo o CSV do catálogo
+(`catalogo_ruas`) e filtrando por categoria. As etapas continuam disponíveis
+como subcomandos, para rodar uma de cada vez:
 
     coletar    zonas e vistas candidatas (só metadados)
     baixar     closes, quadrados e vistas de contexto
@@ -14,6 +16,7 @@ etapas continuam disponíveis como subcomandos, para rodar uma de cada vez:
 """
 
 import argparse
+import csv
 import os
 import sqlite3
 import sys
@@ -182,6 +185,90 @@ def cmd_rua(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
 
 
 # --------------------------------------------------------------------------- #
+# Coleta em lote (várias ruas do catálogo)
+# --------------------------------------------------------------------------- #
+
+CSV_CATALOGO = config.CACHE_RUAS / "ruas_curitiba_classificadas.csv"
+
+
+def _ler_catalogo(caminho: Path, categorias: Optional[str], incluir_ruido: bool,
+                  min_comprimento: int) -> list[str]:
+    """
+    Nomes de rua do CSV do catálogo, na ordem do arquivo (principais primeiro),
+    aplicando os filtros. `categorias` é uma lista separada por vírgula com os
+    valores exatos da coluna `categoria` (sem isso, todas). Pula o
+    `provavel_ruido` (a menos de --incluir-ruido) e ruas menores que
+    `min_comprimento` metros.
+    """
+    if not caminho.exists():
+        sys.exit(f"CSV do catálogo não encontrado: {caminho}\n"
+                 "Gere-o com: python -m scripts.ingestao.coleta_streetview.catalogo_ruas")
+    alvo = {c.strip().lower() for c in categorias.split(",") if c.strip()} if categorias else None
+    nomes, categorias_vistas = [], set()
+    with open(caminho, encoding="utf-8", newline="") as f:
+        for linha in csv.DictReader(f):
+            categoria = (linha.get("categoria") or "").strip()
+            categorias_vistas.add(categoria)
+            if alvo is not None and categoria.lower() not in alvo:
+                continue
+            if not incluir_ruido and (linha.get("provavel_ruido") or "").strip() == "sim":
+                continue
+            try:
+                comprimento = int(linha.get("comprimento_m") or 0)
+            except ValueError:
+                comprimento = 0
+            if comprimento < min_comprimento:
+                continue
+            if linha.get("nome"):
+                nomes.append(linha["nome"])
+    if alvo is not None and not nomes:
+        disponiveis = "\n  ".join(sorted(c for c in categorias_vistas if c))
+        sys.exit(f"Nenhuma rua nas categorias pedidas. Categorias no CSV:\n  {disponiveis}")
+    return nomes
+
+
+def cmd_lote(args, conn: sqlite3.Connection, parser: argparse.ArgumentParser):
+    """
+    Coleta várias ruas de uma vez, uma a uma, lendo o CSV do catálogo. Reusa o
+    fluxo `rua` em cada uma (que já pula o que foi coletado, retoma de onde
+    parou e publica no Supabase), então o lote é idempotente: pode ser
+    interrompido e rodado de novo que continua. Uma rua que falhar (não achada,
+    Overpass fora, etc.) é pulada sem derrubar o resto.
+    """
+    nomes = _ler_catalogo(args.csv, args.categoria, args.incluir_ruido, args.min_comprimento)
+    if args.max_ruas:
+        nomes = nomes[:args.max_ruas]
+    total = len(nomes)
+    por_rua = f"{args.limite_por_rua} zonas por rua" if args.limite_por_rua else "todas as zonas de cada rua"
+    print(f"Coleta em lote: {total} ruas, {por_rua}.")
+    if args.categoria:
+        print(f"  Categorias: {args.categoria}")
+
+    feitas, falhas = 0, []
+    t0 = time.time()
+    for i, nome in enumerate(nomes, 1):
+        print(f"\n{'#' * 60}\n[{i}/{total}] {nome}\n{'#' * 60}")
+        rua_args = argparse.Namespace(comando="rua", nome=nome, limite=args.limite_por_rua,
+                                      sem_supabase=args.sem_supabase)
+        try:
+            cmd_rua(rua_args, conn, parser)
+            feitas += 1
+        except KeyboardInterrupt:
+            print("\nLote interrompido. O que já foi coletado está salvo; "
+                  "rode o mesmo comando para continuar de onde parou.")
+            break
+        except Exception as exc:  # uma rua ruim não derruba o lote
+            print(f"  (pulando \"{nome}\": {exc})")
+            falhas.append(nome)
+
+    print(f"\n{'=' * 60}\nLote: {feitas}/{total} ruas processadas em {(time.time() - t0) / 60:.0f} min.")
+    if falhas:
+        amostra = ", ".join(falhas[:10]) + (" ..." if len(falhas) > 10 else "")
+        print(f"  {len(falhas)} puladas: {amostra}")
+    print(resumo_exportacao(exportar_ruas(conn)))
+
+
+# --------------------------------------------------------------------------- #
 # Argumentos
 # --------------------------------------------------------------------------- #
 
@@ -203,6 +290,22 @@ def criar_parser() -> argparse.ArgumentParser:
     p.add_argument("--sem-supabase", action="store_true",
                    help="não publica no Supabase no fim (por padrão publica se SUPABASE_URL e "
                         "SUPABASE_SERVICE_KEY estiverem no ambiente)")
+
+    lote = sub.add_parser("lote", help="coleta várias ruas do catálogo (CSV), uma a uma")
+    lote.add_argument("--csv", type=Path, default=CSV_CATALOGO,
+                      help=f"CSV do catálogo (default: {CSV_CATALOGO.relative_to(config.RAIZ)})")
+    lote.add_argument("--categoria",
+                      help='categorias a coletar, exatas como no CSV, separadas por vírgula, ex.: '
+                           '"Arterial principal,Arterial secundária,Coletora"; sem isso, todas')
+    lote.add_argument("--limite-por-rua", type=int,
+                      help="só N zonas por rua, espalhadas; sem isso, todas as que faltam em cada rua")
+    lote.add_argument("--max-ruas", type=int, help="processa no máximo N ruas nesta rodada")
+    lote.add_argument("--min-comprimento", type=int, default=0,
+                      help="ignora ruas com menos de N metros (default: 0, todas)")
+    lote.add_argument("--incluir-ruido", action="store_true",
+                      help="não pula o que está marcado como provável ruído (Acesso, Condomínio, etc.)")
+    lote.add_argument("--sem-supabase", action="store_true",
+                      help="não publica no Supabase ao fim de cada rua")
 
     p = sub.add_parser("coletar", help="zonas de calçada e vistas candidatas (só metadados)")
     p.add_argument("--rua", help='só uma rua, ex: "Rua XV de Novembro" (ignora --bbox)')
@@ -275,6 +378,8 @@ def main(argv: Optional[list[str]] = None):
     conn = abrir_db()
     if args.comando == "rua":
         cmd_rua(args, conn, parser)
+    elif args.comando == "lote":
+        cmd_lote(args, conn, parser)
     else:
         {"coletar": cmd_coletar, "baixar": cmd_baixar, "segmentar": cmd_segmentar,
          "reavaliar": cmd_reavaliar, "rotular": cmd_rotular,
