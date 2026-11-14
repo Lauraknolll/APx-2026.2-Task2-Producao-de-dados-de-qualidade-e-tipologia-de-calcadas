@@ -82,9 +82,15 @@ O `.exe` sai em `dist\Calcadas\` com o modelo dentro.
 
 ## Git
 
-A pasta tem o histórico do Git. A branch atual já tem os commits novos, e os arquivos
-pesados e locais (`.venv`, modelos, banco, fotos) ficam fora pelo `.gitignore`. Para publicar:
+Para a pasta ficar leve, ela não traz o histórico do Git (`.git`). Os commits novos estão em
+`feature-31-pipeline.bundle`. Para publicar a branch, a partir de um clone do repositório:
 
 ```powershell
+git clone https://github.com/Lauraknolll/APx-2026.2-Task2-Producao-de-dados-de-qualidade-e-tipologia-de-calcadas.git apx-git
+cd apx-git
+git fetch ..\<esta-pasta>\feature-31-pipeline.bundle feature/31-pipeline-unificado-de-inferencia:feature/31-pipeline-unificado-de-inferencia
+git checkout feature/31-pipeline-unificado-de-inferencia
 git push -u origin feature/31-pipeline-unificado-de-inferencia
 ```
+
+O `.joblib` não vai para o Git (`.gitignore`). Guarde-o no Drive ou no Storage do Supabase.
