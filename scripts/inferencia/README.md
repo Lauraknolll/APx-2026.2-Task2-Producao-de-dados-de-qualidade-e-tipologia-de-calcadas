@@ -27,6 +27,12 @@ não tem essa classe nem cabe nas classes do mapa.
 
 ## 1. Gerar o modelo (uma vez)
 
+> **Recomendado:** `treinar_modelo.py`, na raiz. É um arquivo só, com os campos do Roboflow
+> marcados em "PREENCHA AQUI", e gera também o relatório do teste em
+> `data/reports/modelo_producao/` (predições por imagem, matriz de confusão, amostras de
+> acertos e erros). O `scripts.inferencia.treinar` abaixo faz o mesmo treino usando os
+> utilitários de `scripts/utils/`.
+
 Da raiz do repositório, com o ambiente dos notebooks (`requirements.txt`) e o
 `.env` com as chaves do Roboflow:
 

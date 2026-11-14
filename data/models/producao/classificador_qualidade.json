@@ -1,0 +1,69 @@
+{
+  "nome": "cenario04-apx2-bzsou-v4",
+  "classes": [
+    "Adequada",
+    "Inadequada Geral",
+    "Não id."
+  ],
+  "backbone": "projectsidewalk/sidewalk-validator-ai-surfaceproblem",
+  "dataset": "apx2-bzsou-v4",
+  "sklearn": "1.9.1",
+  "metricas": {
+    "validacao": {
+      "acuracia": 0.688,
+      "acuracia_balanceada": 0.5401,
+      "f1_macro": 0.5424,
+      "f1_ponderado": 0.6697,
+      "f1_por_classe": {
+        "Adequada": 0.776,
+        "Inadequada Geral": 0.663,
+        "Não id.": 0.188
+      },
+      "matriz_confusao": [
+        [
+          92,
+          17,
+          1
+        ],
+        [
+          30,
+          66,
+          5
+        ],
+        [
+          5,
+          15,
+          3
+        ]
+      ]
+    },
+    "teste": {
+      "acuracia": 0.7565,
+      "acuracia_balanceada": 0.6467,
+      "f1_macro": 0.664,
+      "f1_ponderado": 0.7477,
+      "f1_por_classe": {
+        "Adequada": 0.797,
+        "Inadequada Geral": 0.774,
+        "Não id.": 0.421
+      },
+      "matriz_confusao": [
+        [
+          47,
+          5,
+          1
+        ],
+        [
+          12,
+          36,
+          2
+        ],
+        [
+          6,
+          2,
+          4
+        ]
+      ]
+    }
+  }
+}

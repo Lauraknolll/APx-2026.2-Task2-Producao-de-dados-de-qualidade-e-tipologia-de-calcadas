@@ -1,0 +1,13 @@
+# Ambiente do treino (Python 3.11 ou 3.12):
+#   python -m venv .venv-treino
+#   .venv-treino\Scripts\pip install -r requirements-treino.txt
+# Com GPU NVIDIA, instale antes o torch com CUDA: https://pytorch.org/get-started/locally/
+torch
+transformers
+pillow
+numpy
+scikit-learn==1.9.1
+joblib
+roboflow
+python-dotenv
+matplotlib

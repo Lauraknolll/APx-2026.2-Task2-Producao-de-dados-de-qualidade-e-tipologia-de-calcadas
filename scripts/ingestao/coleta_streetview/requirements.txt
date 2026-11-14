@@ -26,5 +26,5 @@ torchvision
 transformers
 
 # Avaliação automática da qualidade (scripts/inferencia): o .joblib é um pipeline do scikit-learn
-scikit-learn
+scikit-learn==1.9.1   # a mesma versão que gerou o .joblib (data/models/producao/classificador_qualidade.json)
 joblib
