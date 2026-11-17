@@ -11,14 +11,18 @@ __pycache__/
 .vscode/
 
 # Modelos e arquivos pesados (>50MB)
-data/models/**/*.pth
-data/models/**/*.pt
-data/models/**/*.joblib
+data/models/baselines/
 *.pth
 *.pt
 *.joblib
 *.zip
 .agents/
+
+# Permite os modelos leves de Curitiba no Git (total ~7.5MB)
+!data/models/v3/*.pth
+!data/models/v3/*.joblib
+!data/models/v4/*.pth
+!data/models/v4/*.joblib
 
 # Repositório clonado para referência local
 sidewalk-tagger-ai/

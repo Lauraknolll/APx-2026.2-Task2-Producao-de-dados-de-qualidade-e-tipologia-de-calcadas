@@ -35,8 +35,8 @@ TAXONOMIAS = {
         "mapa": {0: 0, 1: 1, 2: 1, 3: 1, 4: 2},
     },
     "2_classes_sem_naoid": {
-        "descricao": "2 Classes Binária Crítica (Transitável [Adequada+Parcial] vs Crítica [Inadequada+Sem calçada])",
-        "nomes": ["Transitável", "Crítica (Inad+SemCalc)"],
+        "descricao": "2 Classes Binária Crítica (Transitável vs Crítica)",
+        "nomes": ["Transitável", "Crítica"],
         "mapa": {0: 0, 1: 0, 2: 1, 3: 1},
     },
 }
