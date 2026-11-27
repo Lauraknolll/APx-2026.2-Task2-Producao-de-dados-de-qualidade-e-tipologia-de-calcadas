@@ -1,4 +1,70 @@
-# Inferência: avaliação automática da qualidade das calçadas
+# Inferência de qualidade e diagnóstico de calçadas
+
+## Pipeline unificado
+
+Pipeline unificado e autocontido de inferência de ponta a ponta para classificação de qualidade viária e diagnóstico de problemas físicos em calçadas de Curitiba.
+
+### Uso em Python
+
+#### Inicialização do pipeline
+
+```python
+from scripts.inferencia import SidewalkPipeline
+
+# Inicializa com o cenário recomendado para o IPPUC (Binário: Transitável vs Crítica)
+pipeline = SidewalkPipeline(
+    cenario="binario",  # ou "3classes" (Adequada | Inadequada Geral | Não id.)
+    versao="v4",        # modelos calibrados no dataset v4
+    incluir_tags=True,  # ativa diagnóstico de 11 defeitos pelo Tagger
+)
+```
+
+> O pipeline busca os pesos automaticamente em `data/models/v4/`. Caso não existam localmente, faz o download automático via Hugging Face Hub (`caduobristo/calcadas-curitiba`).
+
+#### Formas de entrada
+
+##### Imagem única
+```python
+# Aceita caminho em string, Path, ou imagem PIL já aberta em memória
+resultado = pipeline.predict("caminho/para/imagem.jpg")
+print(resultado[0]["classe_predita"])  # 'Transitável' ou 'Crítica'
+print(resultado[0]["confianca"])       # 0.8942
+print(resultado[0]["principais_defeitos"])
+# [{'tag': 'cracks', 'probabilidade': 0.621}, {'tag': 'bumpy', 'probabilidade': 0.543}]
+```
+
+##### Lote de imagens
+```python
+lista_fotos = ["foto1.jpg", "foto2.jpg", "foto3.jpg"]
+resultados = pipeline.predict(lista_fotos)
+```
+
+##### Diretório de imagens
+```python
+# Processa todas as imagens da pasta e já exporta para CSV
+df = pipeline.predict(
+    "data/raw/apx2-bzsou-v4/test",
+    retornar_df=True,
+    salvar_em="relatorio_predicoes.csv"
+)
+```
+
+##### Visualização gráfica
+```python
+fig = pipeline.plotar_resultados(resultados, max_imagens=10, salvar_caminho="diagnostico.png")
+```
+
+### Uso pela linha de comando
+
+```bash
+# Inferência em uma pasta inteira salvando CSV
+python -m scripts.inferencia --input data/raw/apx2-bzsou-v4/test --cenario binario --output predicoes.csv
+
+# Inferência em imagem avulsa salvando plot
+python -m scripts.inferencia --input foto_calcada.jpg --plot diagnostico.png
+```
+
+## Avaliação automática na coleta Street View
 
 Cada quadrado de calçada que a coleta aprova (`scripts/ingestao/coleta_streetview`)
 é classificado pelo modelo de produção. O resultado vai para a tabela
@@ -25,7 +91,7 @@ não tem essa classe nem cabe nas classes do mapa.
 | Inadequada Geral (parcial + inadequada + sem calçada) | `inadequada` | 0,4 |
 | Não id. | `nao_identificavel` | fora da média |
 
-## 1. Gerar o modelo (uma vez)
+### Gerar o modelo
 
 > **Recomendado:** `treinar_modelo.py`, na raiz. É um arquivo só, com os campos do Roboflow
 > marcados em "PREENCHA AQUI", e gera também o relatório do teste em
@@ -58,10 +124,10 @@ que cabem nas classes do mapa são aceitas.
 Basta copiar `classificador_cenario04_3classes_com_naoid.joblib` para
 `data/models/producao/classificador_qualidade.joblib`.
 
-> Os `.joblib` ficam fora do git (`.gitignore`). Compartilhe o arquivo com o
-> grupo (Drive, Supabase Storage...) ou gere o seu com o comando acima.
+> O arquivo em `data/models/producao/` fica fora do Git. Os classificadores
+> de `data/models/v4/` estão no repositório.
 
-## 2. Avaliar
+### Avaliar
 
 - **Coletas novas:** é automático. A coleta de uma rua tem agora uma 4ª
   etapa, "Avaliando a qualidade das calçadas", que roda pelo terminal e pela
@@ -90,7 +156,7 @@ Regras:
 - O backbone (~1,2 GB) é baixado do Hugging Face na primeira vez e fica em
   cache. Ele usa a GPU (CUDA ou DirectML) quando houver, como a segmentação.
 
-## Arquivos
+### Arquivos da avaliação automática
 
 | Arquivo | O que faz |
 |---|---|

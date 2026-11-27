@@ -6,6 +6,7 @@ Scripts reutilizáveis de apoio ao projeto: ingestão, transformação, consulta
 
 ```
 scripts/
+├── inferencia/      # Pipeline unificado de classificação e diagnóstico de calçadas
 ├── ingestao/        # Scripts de coleta/carga de dados
 │   └── coleta_streetview/   # Coleta de imagens de calçadas no Street View (ver README da pasta)
 ├── interface/       # Mapa das calçadas e o coletor (.exe): ruas coloridas pela avaliação, avaliação e coleta (ver README da pasta)
