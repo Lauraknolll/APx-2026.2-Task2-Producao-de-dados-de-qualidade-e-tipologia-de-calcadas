@@ -252,6 +252,7 @@ sincronizada a cada rodada: o que deixou de valer sai, o que é novo entra.
 | [streetview.py](streetview.py) | Panoramas do Google e recorte de vistas em perspectiva a partir dos tiles |
 | [banco.py](banco.py) | Banco SQLite com o estado do pipeline, filtro dos quadrados e escolha da vista de cada zona, `data/processed/downloads-ruas/<rua>/` e o `indice.csv` |
 | [etapas.py](etapas.py) | As etapas: 1. `coletar` (zonas e vistas candidatas), 2. `baixar` (closes, quadrados, vistas de contexto), 3. `segmentar` (piso e obstrução de cada quadrado) e `reavaliar` |
+| [../../inferencia/etapa.py](../../inferencia/etapa.py) | 4. `avaliar`: qualidade de cada quadrado com o modelo de produção (ver [scripts/inferencia](../../inferencia/README.md)) |
 | [calibracao.py](calibracao.py) | Gabarito humano dos quadrados (`rotular`) e varredura dos limites do filtro contra ele (`calibrar`) |
 | [cli.py](cli.py) | Menu interativo e subcomandos (inclui `lote`: coleta várias ruas do catálogo) |
 | [catalogo_ruas.py](catalogo_ruas.py) | Gera `data/raw/ruas_osm/ruas_curitiba_classificadas.csv`: todas as vias de Curitiba classificadas (categoria, comprimento), para escolher o que coletar com `lote` |
@@ -267,6 +268,8 @@ Cada módulo abre com uma docstring que explica o que faz e como.
 | `pontos_rua` | A que rua do OSM cada zona pertence (uma zona de esquina pode estar em duas). |
 | `parametros` | O tamanho das zonas. |
 | `rotulos` | O gabarito humano de cada quadrado (`rotular`), usado por `calibrar`. |
+| `avaliacoes` | A qualidade da calçada em cada quadrado (adequada, parcialmente adequada, inadequada, sem calçada, não identificável), dada à mão no [mapa](../../interface/README.md) ou por um modelo. É o que colore as ruas no mapa. |
+| `exportacoes`, `exportados` | Cada exportação das avaliações para conferência no Roboflow, e a avaliação de cada quadrado que foi no último `.zip` (o que define as avaliações "novas"). |
 
 A etapa de avaliação pode recusar a vista escolhida de uma zona com
 `scripts.ingestao.coleta_streetview.banco.registrar_rejeicao(conn, zona, motivo)`: a zona passa para

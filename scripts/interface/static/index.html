@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calçadas de Curitiba</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <!-- Ícones (Lucide, traço 2), usados com <svg><use href="#i-..."/></svg> -->
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-square" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M10 15V9"/><path d="M14 15V9"/></symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+    <symbol id="i-panel-close" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></symbol>
+    <symbol id="i-panel-open" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></symbol>
+  </svg>
+
+  <aside id="painel" aria-label="Painel do mapa">
+    <header class="topo">
+      <div class="marca">
+        <span class="logo" aria-hidden="true"><svg class="icone"><use href="#i-map-pin"/></svg></span>
+        <div>
+          <h1>Calçadas de Curitiba</h1>
+          <p class="sub">Qualidade das calçadas, trecho a trecho</p>
+        </div>
+      </div>
+    </header>
+
+    <section class="secao" aria-labelledby="t-exibicao">
+      <h2 id="t-exibicao">Exibição das avaliações</h2>
+      <div id="modos" class="segmentado" role="radiogroup" aria-labelledby="t-exibicao">
+        <span class="indicador" aria-hidden="true"></span>
+        <button type="button" role="radio" data-modo="ocultar"><svg class="icone" aria-hidden="true"><use href="#i-eye-off"/></svg><span>Ocultar</span></button>
+        <button type="button" role="radio" data-modo="foco"><svg class="icone" aria-hidden="true"><use href="#i-pointer"/></svg><span>Ao passar</span></button>
+        <button type="button" role="radio" data-modo="tudo"><svg class="icone" aria-hidden="true"><use href="#i-eye"/></svg><span>Tudo</span></button>
+      </div>
+      <p id="modo-ajuda" class="ajuda"></p>
+      <div id="legenda" class="legenda"></div>
+      <button id="alternar-fotos" type="button" class="interruptor" role="switch" aria-checked="true">
+        <svg class="icone" aria-hidden="true"><use href="#i-image"/></svg>
+        <span class="interruptor-texto">Fotos no mapa <span class="ajuda-inline">(os pontos de cada foto, de perto)</span></span>
+        <span class="trilho-chave" aria-hidden="true"><span class="bolinha-chave"></span></span>
+      </button>
+    </section>
+
+    <details id="secao-ruas" class="secao recolhivel" open>
+      <summary>
+        <h2 class="titulo">Ruas coletadas <span id="contagem-ruas" class="contagem" title="Ruas no banco"></span></h2>
+        <svg class="icone seta" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </summary>
+      <div class="progresso">
+        <div class="trilho" aria-hidden="true"><span id="progresso-barra"></span></div>
+        <p id="progresso" class="ajuda"></p>
+      </div>
+      <div class="busca">
+        <svg class="icone" aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="busca-ruas" type="search" placeholder="Filtrar pelo nome" aria-label="Filtrar as ruas coletadas" autocomplete="off">
+      </div>
+      <ul id="ruas" class="ruas"><li class="vazio">Carregando…</li></ul>
+    </details>
+
+    <details id="secao-exportar" class="secao recolhivel">
+      <summary>
+        <h2 class="titulo">Exportar para conferência <span id="contagem-novas" class="contagem" title="Avaliações ainda não exportadas"></span></h2>
+        <svg class="icone seta" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </summary>
+      <label class="rotulo" for="exportar-rua">Rua</label>
+      <div class="combo">
+        <svg class="icone combo-lupa" aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="exportar-rua" type="text" role="combobox" autocomplete="off" spellcheck="false"
+               aria-expanded="false" aria-controls="exportar-rua-lista" aria-autocomplete="list" placeholder="Digite para filtrar">
+        <button id="exportar-rua-seta" type="button" class="combo-seta" tabindex="-1" aria-label="Mostrar ou esconder as ruas">
+          <svg class="icone" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+        </button>
+        <ul id="exportar-rua-lista" class="combo-lista" role="listbox" aria-label="Ruas" hidden></ul>
+      </div>
+      <button id="exportar-novas" type="button" class="interruptor" role="switch" aria-checked="true">
+        <span class="interruptor-texto">Só as novas <span class="ajuda-inline">(ainda não exportadas, ou reavaliadas depois)</span></span>
+        <span class="trilho-chave" aria-hidden="true"><span class="bolinha-chave"></span></span>
+      </button>
+      <button id="exportar" type="button" class="botao primario exportar" aria-describedby="exportar-ajuda">
+        <svg class="icone" aria-hidden="true"><use href="#i-download"/></svg><span id="exportar-texto">Exportar</span>
+      </button>
+      <p id="exportar-ajuda" class="ajuda">Um .zip com as fotos e as classes, para importar no Roboflow.</p>
+      <p id="exportar-ultima" class="ajuda"></p>
+    </details>
+
+    <details id="secao-coleta" class="secao recolhivel">
+      <summary>
+        <h2>Coletar uma rua</h2>
+        <svg class="icone seta" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </summary>
+      <form id="form-coleta">
+        <label class="rotulo" for="coleta-nome">Nome da rua</label>
+        <input id="coleta-nome" type="text" placeholder="Rua Comendador Araújo" required aria-describedby="coleta-nome-ajuda">
+        <p id="coleta-nome-ajuda" class="ajuda">Com o tipo da via na frente. Acentos e abreviações não importam.</p>
+        <div class="botoes">
+          <button id="coleta-procurar" type="submit" class="botao primario">
+            <svg class="icone" aria-hidden="true"><use href="#i-search"/></svg><span>Procurar</span>
+          </button>
+          <button id="coleta-parar" type="button" class="botao perigo" hidden>
+            <svg class="icone" aria-hidden="true"><use href="#i-square"/></svg><span>Parar coleta</span>
+          </button>
+        </div>
+      </form>
+      <div id="coleta-candidatas" class="candidatas" hidden></div>
+      <form id="form-confirmar" class="confirmar" hidden>
+        <p id="confirmar-texto"></p>
+        <label class="rotulo" for="coleta-limite">Quantas zonas rodar</label>
+        <input id="coleta-limite" type="number" min="1" step="1" placeholder="todas" aria-describedby="coleta-limite-ajuda">
+        <p id="coleta-limite-ajuda" class="ajuda">Espalhadas pela rua. Vazio roda todas as que faltam.</p>
+        <div class="botoes">
+          <button type="submit" class="botao primario">
+            <svg class="icone" aria-hidden="true"><use href="#i-arrow-right"/></svg><span>Coletar</span>
+          </button>
+          <button id="confirmar-cancelar" type="button" class="botao">Cancelar</button>
+        </div>
+      </form>
+      <p id="coleta-status" class="ajuda" aria-live="polite"></p>
+      <div id="coleta-andamento" class="andamento" hidden>
+        <div class="andamento-topo"><span class="spinner" aria-hidden="true"></span><span id="coleta-titulo"></span></div>
+        <div id="coleta-trilho" class="trilho indeterminado" role="progressbar" aria-labelledby="coleta-titulo"><span id="coleta-barra"></span></div>
+        <p id="coleta-etapa" class="ajuda" aria-live="polite"></p>
+      </div>
+    </details>
+  </aside>
+
+  <main id="mapa" aria-label="Mapa das calçadas"></main>
+
+  <div id="toasts" class="toasts"></div>
+
+  <aside id="zona" hidden aria-labelledby="zona-titulo">
+    <div class="zona-topo">
+      <div>
+        <h2 id="zona-titulo"></h2>
+        <p id="zona-info" class="sub"></p>
+      </div>
+      <button id="zona-fechar" type="button" class="botao-icone" aria-label="Fechar a zona">
+        <svg class="icone" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <figure class="contexto">
+      <img id="zona-contexto" alt="Vista aberta da zona, na mesma direção do close">
+      <figcaption>Vista de contexto ·
+        <a id="zona-streetview" target="_blank" rel="noopener">abrir no Street View
+          <svg class="icone mini" aria-hidden="true"><use href="#i-external"/></svg></a>
+      </figcaption>
+    </figure>
+    <section class="avaliar-zona">
+      <button id="avaliar-cabeca" type="button" class="avaliar-cabeca" aria-expanded="false" aria-controls="avaliar-corpo">
+        <span class="avaliar-titulo">Avaliar</span>
+        <span id="avaliar-resumo" class="avaliar-resumo"></span>
+        <svg class="icone" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </button>
+      <div id="avaliar-corpo" class="avaliar-corpo" hidden>
+        <div class="autor">
+          <label for="autor">Avaliando como</label>
+          <input id="autor" type="text" autocomplete="name" placeholder="seu nome">
+        </div>
+        <div id="zona-quadrados" class="quadrados"></div>
+      </div>
+    </section>
+  </aside>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+          integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous"></script>
+  <script src="dados.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
